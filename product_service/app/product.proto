@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+enum SelectOption {
+    GET = 0;
+    GET_ALL = 1;
+    CREATE = 2;
+    UPDATE = 3;
+    DELETE = 4;
+}
+
+
+message Product {
+    int32 id =1;
+    string product_id=2;
+    string name = 3;
+    string description =4;
+    float price =5;
+    bool is_available = 6;
+    string error_message = 7;
+    SelectOption option =8;
+    int64 status = 9;
+}
+
+message ProductList {
+    repeated Product products = 1;
+}
