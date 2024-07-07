@@ -1,5 +1,5 @@
-name: project-04
-# 01  product service 
+name: online_mart
+  # 01  product service 
 services:
   product:
     container_name: "product"
@@ -11,9 +11,39 @@ services:
       - broker
       - postgres_db_product
     ports:
-      - "8001:8001" # Expose container port 8001 to host port 8001
+      - "8000:8000" # Expose container port 8000 to host port 8000
     volumes:
       - ./product_service:/code/
+
+  # 02  inventory service   
+  inventory:
+    container_name: "inventory"
+    hostname: "inventory"
+    build:
+      context: ./inventory_service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - broker
+      - postgres_db_inventory
+    ports:
+      - "8001:8001" # Expose container port 8001 to host port 8001
+    volumes:
+      - ./inventory_service:/code/
+
+  # 03  order service 
+  order:
+    container_name: "order"
+    hostname: "order"
+    build:
+      context: ./order_service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - broker
+      - postgres_db_order
+    ports:
+      - "8002:8002" # Expose container port 8002 to host port 8002
+    volumes:
+      - ./order_service:/code/
 
   broker:
     image: apache/kafka:3.7.0
@@ -49,7 +79,7 @@ services:
     depends_on:
       - broker
 
-# 01  postgres_db for product  service 
+  # 01  postgres_db for product  service 
 
   postgres_db_product:
     image: postgres:latest # Use the official PostgreSQL image
@@ -64,11 +94,47 @@ services:
     volumes:
       - postgres_db_product:/var/lib/postgresql/data
 
+  # 02  postgres_db for inventory  service 
+
+  postgres_db_inventory:
+    image: postgres:latest # Use the official PostgreSQL image
+    restart: always
+    container_name: PostgresCont_inventory
+    environment:
+      - POSTGRES_USER=wasam
+      - POSTGRES_PASSWORD=wasam_password
+      - POSTGRES_DB=wasam_database_inventory
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_db_inventory:/var/lib/postgresql/data
+
+
+  # 03  postgres_db for order  service 
+
+  postgres_db_order:
+    image: postgres:latest # Use the official PostgreSQL image
+    restart: always
+    container_name: PostgresCont_order
+    environment:
+      - POSTGRES_USER=wasam
+      - POSTGRES_PASSWORD=wasam_password
+      - POSTGRES_DB=wasam_database_order
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_db_order:/var/lib/postgresql/data
 
 volumes:
+  # Volume for product
   postgres_db_product:
     driver: local
-
+  #volume for inventory
+  postgres_db_inventory:
+    driver: local
+  #volume for order
+  postgres_db_order:
+    driver: local
 
 networks:
   default:
