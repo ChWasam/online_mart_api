@@ -18,7 +18,7 @@ message Product {
     bool is_available = 6;
     string error_message = 7;
     SelectOption option =8;
-    int64 status = 9;
+    int64 http_status_code = 9;
 }
 
 message ProductList {

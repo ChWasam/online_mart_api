@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from aiokafka import AIOKafkaProducer , AIOKafkaConsumer
 from aiokafka.admin import AIOKafkaAdminClient,NewTopic
-from app import product_pb2
+from app import order_pb2
 from app import settings
 from app import db 
 from app.consumer import main
@@ -51,7 +51,7 @@ async def create_topic ():
     finally:
         await admin_client.close()
 
-#  Function to consume list of all products from kafkatopic
+#  Function to consume list of all orders from kafkatopic
 async def consume_message_response_get_all():
     consumer = AIOKafkaConsumer(
     f"{settings.KAFKA_TOPIC_GET}",
@@ -64,7 +64,7 @@ async def consume_message_response_get_all():
         async for msg in consumer:
             logger.info(f"message from consumer : {msg}")
             try:
-                new_msg = product_pb2.ProductList()
+                new_msg = order_pb2.orderList()
                 new_msg.ParseFromString(msg.value)
                 logger.info(f"new_msg on producer side:{new_msg}")
                 return new_msg
@@ -73,7 +73,7 @@ async def consume_message_response_get_all():
     finally:
         await consumer.stop()
 
-#  Function to consume all messages other than list of all products from kafkatopic
+#  Function to consume all messages other than list of all orders from kafkatopic
 async def consume_message_response_get():
     consumer = AIOKafkaConsumer(
     f"{settings.KAFKA_TOPIC_GET}",
@@ -86,7 +86,7 @@ async def consume_message_response_get():
         async for msg in consumer:
             logger.info(f"message from consumer in producer  : {msg}")
             try:
-                new_msg = product_pb2.Product()
+                new_msg = order_pb2.Order()
                 new_msg.ParseFromString(msg.value)
                 logger.info(f"new_msg on producer side:{new_msg}")
                 return new_msg
@@ -97,13 +97,22 @@ async def consume_message_response_get():
 
 
 # Pydantic dataValidation 
-class Product(SQLModel):
+class Orders(SQLModel):
     id : int|None = Field(default = None , primary_key= True)
-    product_id:UUID = Field(default_factory=uuid.uuid4, index=True)
-    name:str = Field(index=True)
-    description:str = Field(index=True)
-    price:float= Field(index=True)
-    is_available: bool = Field(default=True)
+    order_id:UUID = Field(default_factory=uuid.uuid4, index=True)
+    product_id:UUID = Field(index=True)
+    quantity:int = Field(index=True)
+    shipping_address:str = Field(index=True)
+    customer_notes:str = Field(index=True)
+
+class OrdersInputField(SQLModel):
+    quantity:int = Field(index=True)
+    shipping_address:str = Field(index=True)
+    customer_notes:str = Field(index=True)
+
+
+
+
 
 #  Function to produce message. I will work as a dependency injection for APIs
 async def produce_message():
@@ -130,82 +139,87 @@ async def lifespan(app: FastAPI):
 
 
 
-# Home Endpoint
+
 app:FastAPI = FastAPI(lifespan=lifespan )
+
+# Home Endpoint
 @app.get("/")
 async def read_root():
-    return {"Hello":"Product Service"}
+    return {"Hello":"Order Service"}
 
-# Endpoint to get all the products
-@app.get("/products", response_model= list[Product])
-async def get_all_products(producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    product_proto = product_pb2.Product(option = product_pb2.SelectOption.GET_ALL)
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_list_proto = await consume_message_response_get_all()
+# Endpoint to get all the orders
+@app.get("/orders", response_model= list[Orders])
+async def get_all_orders(producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+    order_proto = order_pb2.Order(option = order_pb2.SelectOption.GET_ALL)
+    serialized_order = order_proto.SerializeToString()
+    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+    order_list_proto = await consume_message_response_get_all()
 
-    product_list = [
+    order_list = [
         {
-            "id":product.id,
-            "product_id":str(product.product_id),
-            "name":product.name,
-            "description":product.description,
-            "price":product.price,
-            "is_available":product.is_available,
+            "id":order.id,
+            "order_id":str(order.order_id),
+            "name":order.name,
+            "description":order.description,
+            "price":order.price,
+            "is_available":order.is_available,
 
         }
-        for product in product_list_proto.products
+        for order in order_list_proto.orders
     ]
-    return product_list
+    return order_list
 
 
-#  Endpoint to get the single product based on endpoint 
-@app.get("/products/{product_id}", response_model=dict)
-async def get_a_product(product_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    product_proto = product_pb2.Product(product_id =str(product_id),  option = product_pb2.SelectOption.GET)
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_proto = await consume_message_response_get()
-    if product_proto.error_message or product_proto.status :
-        raise HTTPException(status_code=product_proto.status, detail=product_proto.error_message)
+#  Endpoint to get the single order based on endpoint 
+@app.get("/order/{order_id}", response_model=dict)
+async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+    order_proto = order_pb2.Order(order_id =str(order_id),  option = order_pb2.SelectOption.GET)
+    serialized_order = order_proto.SerializeToString()
+    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+    order_proto = await consume_message_response_get()
+    if order_proto.error_message or order_proto.http_status_code :
+        raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     else:
-        return MessageToDict(product_proto)
+        return MessageToDict(order_proto)
 
 
-#  Endpoint to add product to database 
-@app.post("/products", response_model=dict)
-async  def add_product (product:Product , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    product_proto = product_pb2.Product(name = product.name, description = product.description , price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.CREATE)
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-
-    return {f"product with name : {product.name} " : "added" }
-
-
-#  Endpoint to update product to database 
-@app.put("/products/{product_id}", response_model = dict)
-async  def update_product (product_id:UUID, product:Product , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    product_proto = product_pb2.Product(product_id= str(product_id), name = product.name, description = product.description ,price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.UPDATE)
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_proto = await consume_message_response_get()
-    if product_proto.error_message or product_proto.status :
-        raise HTTPException(status_code=product_proto.status, detail=product_proto.error_message)
+#  Endpoint to add order to database 
+@app.post("/order/{product_id}", response_model=dict)
+async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+    order_proto = order_pb2.Order(product_id = str(product_id), quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes ,option = order_pb2.SelectOption.CREATE)
+    serialized_order = order_proto.SerializeToString()
+    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+    order_proto = await consume_message_response_get()
+    if order_proto.error_message or order_proto.http_status_code:
+        raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     else:
-        return{"Updated Message": MessageToDict(product_proto)}
+        return{"Order Created": MessageToDict(order_proto)}
 
 
-#  Endpoint to delete product from database 
-@app.delete("/products/{product_id}", response_model=dict)
-async  def delete_product (product_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    product_proto = product_pb2.Product(product_id= str(product_id), option = product_pb2.SelectOption.DELETE)
-    serialized_product = product_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_proto = await consume_message_response_get()
-    if product_proto.error_message or product_proto.status :
-        raise HTTPException(status_code=product_proto.status, detail=product_proto.error_message)
+#  Endpoint to update order to database 
+@app.put("/orders/{order_id}", response_model = dict)
+async  def update_order (order_id:UUID, order:Orders , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+    order_proto = order_pb2.Order(order_id= str(order_id), name = order.name, description = order.description ,price = order.price , is_available = order.is_available, option = order_pb2.SelectOption.UPDATE)
+    serialized_order = order_proto.SerializeToString()
+    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+    order_proto = await consume_message_response_get()
+    if order_proto.error_message or order_proto.http_status_code :
+        raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     else:
-        return{"Updated Message": product_proto.error_message }
+        return{"Updated Message": MessageToDict(order_proto)}
+
+
+#  Endpoint to delete order from database 
+@app.delete("/orders/{order_id}", response_model=dict)
+async  def delete_order (order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+    order_proto = order_pb2.Order(order_id= str(order_id), option = order_pb2.SelectOption.DELETE)
+    serialized_order = order_proto.SerializeToString()
+    await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+    order_proto = await consume_message_response_get()
+    if order_proto.error_message or order_proto.http_status_code :
+        raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
+    else:
+        return{"Updated Message": order_proto.error_message }
 
 
 

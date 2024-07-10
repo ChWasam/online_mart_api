@@ -81,7 +81,7 @@ async def handle_get_product(product_id):
         else:
             product_proto = product_pb2.Product(
                 error_message=f"No Product with product_id: {product_id} found!",
-                status=400
+                http_status_code=400
             )
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
@@ -98,7 +98,28 @@ async def handle_create_product(new_msg):
     with Session(db.engine) as session:
         session.add(product)
         session.commit()
-    logger.info(f"Product added to database: {product}")
+        logger.info(f"Product added to database: {product}")
+        session.refresh(product)
+        if product:
+            product_proto = product_pb2.Product(
+                id=product.id,
+                product_id=str(product.product_id),
+                name=product.name,
+                description=product.description,
+                price=product.price,
+                is_available=product.is_available,
+            )
+            serialized_product = product_proto.SerializeToString()
+            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+            logger.info(f"Product added to database and sent back: {product_proto}")
+        else:
+            product_proto = product_pb2.Product(
+                error_message=f"{new_msg.name} is unable to add in database",
+                http_status_code=404
+            )
+            serialized_product = product_proto.SerializeToString()
+            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+            
 
 
 #  Function to handle update product request from producer side from where API is called to update product to database 
@@ -127,7 +148,7 @@ async def handle_update_product(new_msg):
         else:
             product_proto = product_pb2.Product(
                 error_message=f"No Product with product_id: {new_msg.product_id} found!",
-                status=400
+                http_status_code=404
             )
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
@@ -142,7 +163,7 @@ async def handle_delete_product(product_id):
             session.commit()
             product_proto = product_pb2.Product(
                 error_message=f"Product with product_id: {product_id} deleted!",
-                status=200
+                http_status_code=200
             )
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
@@ -150,7 +171,7 @@ async def handle_delete_product(product_id):
         else:
             product_proto = product_pb2.Product(
                 error_message=f"No Product with product_id: {product_id} found!",
-                status=400
+                http_status_code=404
             )
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)

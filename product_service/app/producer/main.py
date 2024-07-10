@@ -41,8 +41,8 @@ async def create_topic ():
     )
     await retry_async(admin_client.start)
     topic_list = [
-        NewTopic(name=f"{settings.KAFKA_TOPIC}", num_partitions=2, replication_factor=1),
-        NewTopic(name=f"{settings.KAFKA_TOPIC_GET}", num_partitions=2, replication_factor=1)
+        NewTopic(name=f"{(settings.KAFKA_TOPIC).strip()}", num_partitions=2, replication_factor=1),
+        NewTopic(name=f"{(settings.KAFKA_TOPIC_GET).strip()}", num_partitions=2, replication_factor=1)
     ]
     try:
         await admin_client.create_topics(new_topics=topic_list, validate_only= False)
@@ -74,7 +74,7 @@ async def consume_message_response_get_all():
         await consumer.stop()
 
 #  Function to consume all messages other than list of all products from kafkatopic
-async def consume_message_response_get():
+async def consume_message_response():
     consumer = AIOKafkaConsumer(
     f"{settings.KAFKA_TOPIC_GET}",
     bootstrap_servers= f"{settings.BOOTSTRAP_SERVER}",
@@ -97,6 +97,7 @@ async def consume_message_response_get():
 
 
 # Pydantic dataValidation 
+#  Product create, productupdate, productresponse 
 class Product(SQLModel):
     id : int|None = Field(default = None , primary_key= True)
     product_id:UUID = Field(default_factory=uuid.uuid4, index=True)
@@ -165,10 +166,11 @@ async def get_a_product(product_id:UUID, producer:Annotated[AIOKafkaProducer,Dep
     product_proto = product_pb2.Product(product_id =str(product_id),  option = product_pb2.SelectOption.GET)
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_proto = await consume_message_response_get()
-    if product_proto.error_message or product_proto.status :
-        raise HTTPException(status_code=product_proto.status, detail=product_proto.error_message)
+    product_proto = await consume_message_response()
+    if product_proto.error_message or product_proto.http_status_code :
+        raise HTTPException(status_code=product_proto.http_status_code, detail=product_proto.error_message)
     else:
+        
         return MessageToDict(product_proto)
 
 
@@ -178,8 +180,22 @@ async  def add_product (product:Product , producer:Annotated[AIOKafkaProducer,De
     product_proto = product_pb2.Product(name = product.name, description = product.description , price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.CREATE)
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
+    product_proto = await consume_message_response()
+    if product_proto.error_message or product_proto.http_status_code :
+        raise HTTPException(status_code=product_proto.http_status_code, detail=product_proto.error_message)
+    else:
+        product_return_from_db = {
+            "id":product_proto.id,
+            "product_id":str(product_proto.product_id),
+            "name":product_proto.name,
+            "description":product_proto.description,
+            "price":product_proto.price,
+            "is_available":product_proto.is_available,
+        }
+        return product_return_from_db
+        # or
+        # return MessageToDict(product_proto)
 
-    return {f"product with name : {product.name} " : "added" }
 
 
 #  Endpoint to update product to database 
@@ -188,9 +204,9 @@ async  def update_product (product_id:UUID, product:Product , producer:Annotated
     product_proto = product_pb2.Product(product_id= str(product_id), name = product.name, description = product.description ,price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.UPDATE)
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_proto = await consume_message_response_get()
-    if product_proto.error_message or product_proto.status :
-        raise HTTPException(status_code=product_proto.status, detail=product_proto.error_message)
+    product_proto = await consume_message_response()
+    if product_proto.error_message or product_proto.http_status_code :
+        raise HTTPException(status_code=product_proto.http_status_code, detail=product_proto.error_message)
     else:
         return{"Updated Message": MessageToDict(product_proto)}
 
@@ -201,9 +217,9 @@ async  def delete_product (product_id:UUID, producer:Annotated[AIOKafkaProducer,
     product_proto = product_pb2.Product(product_id= str(product_id), option = product_pb2.SelectOption.DELETE)
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
-    product_proto = await consume_message_response_get()
-    if product_proto.error_message or product_proto.status :
-        raise HTTPException(status_code=product_proto.status, detail=product_proto.error_message)
+    product_proto = await consume_message_response()
+    if product_proto.error_message or product_proto.http_status_code :
+        raise HTTPException(status_code=product_proto.http_status_code, detail=product_proto.error_message)
     else:
         return{"Updated Message": product_proto.error_message }
 
