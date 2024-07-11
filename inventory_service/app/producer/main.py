@@ -229,10 +229,6 @@ async  def reduce_inventory (product_id:UUID, reduce_stock_level:int , producer:
                 "stock_level":inventory_proto.stock_level,
                 "reserved_stock":inventory_proto.reserved_stock,
         }
-
-
-
-
 #  Endpoint to update inventory to database 
 @app.put("/inventorys/{inventory_id}", response_model = dict)
 async  def update_inventory (inventory_id:UUID, inventory:Inventory , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):

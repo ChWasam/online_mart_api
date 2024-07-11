@@ -44,10 +44,12 @@ message Order {
     int64 quantity= 4;
     string shipping_address = 5;
     string customer_notes = 6;
-    bool stock_available  = 7;
-    string error_message = 8;
-    SelectOption option =9;
-    int64 http_status_code = 10;
+    int64 stock_level = 7;
+    bool is_product_available = 8;
+    bool is_stock_available  = 9;
+    string error_message = 10;
+    SelectOption option =11;
+    int64 http_status_code = 12;
 }
 
 message InventoryList {
