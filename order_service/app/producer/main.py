@@ -163,7 +163,6 @@ async def get_all_orders(producer:Annotated[AIOKafkaProducer,Depends(produce_mes
             "description":order.description,
             "price":order.price,
             "is_available":order.is_available,
-
         }
         for order in order_list_proto.orders
     ]
@@ -190,8 +189,10 @@ async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotate
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
     order_proto = await consume_message_response_get()
-    if order_proto.error_message or order_proto.http_status_code:
+    if order_proto.error_message and order_proto.http_status_code:
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
+    elif order_proto.error_message :
+        return {"Order not creted": f"{order_proto.error_message}"}
     else:
         return{"Order Created": MessageToDict(order_proto)}
 

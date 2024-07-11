@@ -16,8 +16,7 @@ message Order {
     int64 quantity= 4;
     string shipping_address = 5;
     string customer_notes = 6;
-
-    
+    bool stock_available  = 7;
     string error_message = 8;
     SelectOption option =9;
     int64 http_status_code = 10;

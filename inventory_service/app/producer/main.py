@@ -128,11 +128,14 @@ async def lifespan(app: FastAPI):
     
     task1 = loop.create_task(main.consume_message_from_producer_of_inventory())
     task2 = loop.create_task(main.consume_message_from_create_product_of_product())
+    task3 = loop.create_task(main.consume_message_for_inventory_check())
+
+    
     
     try:
         yield
     finally:
-        for task in [task1, task2]:
+        for task in [task1, task2,task3]:
             task.cancel()
             try:
                 await task
@@ -205,7 +208,7 @@ async  def add_inventory (product_id:UUID, add_stock_level:int , producer:Annota
         }
 
 
-
+#  Endpoint to reduce inventory from database 
 @app.post("/inventory/{product_id}/reduce/{reduce_stock_level}", response_model=dict)
 async  def reduce_inventory (product_id:UUID, reduce_stock_level:int , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     inventory_proto = inventory_pb2.Inventory(

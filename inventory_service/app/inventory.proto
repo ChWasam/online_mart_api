@@ -37,6 +37,19 @@ message Product {
     int64 http_status_code = 9;
 }
 
+message Order {
+    int32 id =1;
+    string order_id=2;
+    string product_id =3;
+    int64 quantity= 4;
+    string shipping_address = 5;
+    string customer_notes = 6;
+    bool stock_available  = 7;
+    string error_message = 8;
+    SelectOption option =9;
+    int64 http_status_code = 10;
+}
+
 message InventoryList {
     repeated Inventory Inventories = 1;
 }

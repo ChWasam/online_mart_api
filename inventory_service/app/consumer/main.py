@@ -178,7 +178,7 @@ async def handle_update_inventory(new_msg):
         else:
             inventory_proto = inventory_pb2.Inventory(
                 error_message=f"No Inventory with inventory_id: {new_msg.inventory_id} found!",
-                http_status_code=400
+                http_status_code=404
             )
             serialized_inventory = inventory_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
@@ -240,7 +240,7 @@ async def consume_message_from_producer_of_inventory():
         await consumer.stop()
 
 
-#  Function to consume message from the create product API on the producer side of ptoduct service  and update product with id in inventory service 
+#  Function to consume message from the create product API on the producer side of product service  and update product with id in inventory service 
 async def consume_message_from_create_product_of_product():
     consumer = AIOKafkaConsumer(
         f"{(settings.KAFKA_TOPIC_GET_FROM_PRODUCT).strip()}",
@@ -262,6 +262,45 @@ async def consume_message_from_create_product_of_product():
             with Session(db.engine) as session:
                 session.add(inventory)
                 session.commit()
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+    finally:
+        await consumer.stop()
+
+
+
+#  Function to consume message from the inventory check on the consumer  side of order service  and send back the status that is available or not
+async def consume_message_for_inventory_check():
+    consumer = AIOKafkaConsumer(
+        f"{(settings.KAFKA_TOPIC_INVENTORY_CHECK_REQUEST).strip()}",
+        bootstrap_servers=f"{settings.BOOTSTRAP_SERVER}",
+        group_id=f"{(settings.KAFKA_CONSUMER_GROUP_ID_FOR_INVENTORY_CHECK)}",
+        auto_offset_reset='earliest'
+    )
+    await retry_async(consumer.start)
+    try:
+        async for msg in consumer:
+            logger.info(f"Message received at the consumer on the consumer side of inventory  {msg}")
+            new_msg = inventory_pb2.Order()
+            new_msg.ParseFromString(msg.value)
+            logger.info(f"new_msg received at the consumer on the consumer side of inventory: {new_msg}")
+            with Session(db.engine) as session:
+                inventory = session.exec(select(Inventory).where(Inventory.product_id == new_msg.product_id)).first()
+                if (inventory.stock_level - new_msg.quantity) >= 0:
+                    stock_available  = True
+                    inventory.stock_level = inventory.stock_level - new_msg.quantity
+                    inventory.reserved_stock += new_msg.quantity
+                    session.add(inventory)
+                    session.commit()
+                    session.refresh(inventory)
+                else:
+                    stock_available  = False
+                logger.info(f"IS stock_available: {stock_available}")
+                inventory_check_proto = inventory_pb2.Order(
+                stock_available=stock_available,
+                )
+                serialized_inventory_check_response = inventory_check_proto.SerializeToString()
+                await produce_message(settings.KAFKA_TOPIC_INVENTORY_CHECK_RESPONSE, serialized_inventory_check_response)
     except Exception as e:
         logger.error(f"Error processing message: {e}")
     finally:
