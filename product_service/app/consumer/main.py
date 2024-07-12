@@ -108,6 +108,7 @@ async def handle_create_product(new_msg):
                 description=product.description,
                 price=product.price,
                 is_available=product.is_available,
+                option = product_pb2.SelectOption.CREATE,
             )
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
@@ -162,8 +163,9 @@ async def handle_delete_product(product_id):
             session.delete(product)
             session.commit()
             product_proto = product_pb2.Product(
-                error_message=f"Product with product_id: {product_id} deleted!",
-                http_status_code=200
+                product_id = product_id,
+                message=f"Product with product_id: {product_id} deleted!",
+                option = product_pb2.SelectOption.DELETE
             )
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)

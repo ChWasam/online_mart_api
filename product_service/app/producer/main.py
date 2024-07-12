@@ -218,10 +218,15 @@ async  def delete_product (product_id:UUID, producer:Annotated[AIOKafkaProducer,
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
     product_proto = await consume_message_response()
-    if product_proto.error_message or product_proto.http_status_code :
+    logger.info(f"Complete Product Proto: {product_proto}")
+    if product_proto.message:
+        return {"Product Deleted " : product_proto.message }
+    elif product_proto.error_message or product_proto.http_status_code :
         raise HTTPException(status_code=product_proto.http_status_code, detail=product_proto.error_message)
+
+
     else:
-        return{"Updated Message": product_proto.error_message }
+        return{"Product not deleted ": product_proto.error_message }
 
 
 

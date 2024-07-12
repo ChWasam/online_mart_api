@@ -13,17 +13,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rproduct.proto\"\xc1\x01\n\x07Product\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x12\n\nproduct_id\x18\x02 \x01(\t\x12\x0c\n\x04name\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\r\n\x05price\x18\x05 \x01(\x02\x12\x14\n\x0cis_available\x18\x06 \x01(\x08\x12\x15\n\rerror_message\x18\x07 \x01(\t\x12\x1d\n\x06option\x18\x08 \x01(\x0e\x32\r.SelectOption\x12\x18\n\x10http_status_code\x18\t \x01(\x03\")\n\x0bProductList\x12\x1a\n\x08products\x18\x01 \x03(\x0b\x32\x08.Product*H\n\x0cSelectOption\x12\x07\n\x03GET\x10\x00\x12\x0b\n\x07GET_ALL\x10\x01\x12\n\n\x06\x43REATE\x10\x02\x12\n\n\x06UPDATE\x10\x03\x12\n\n\x06\x44\x45LETE\x10\x04\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rproduct.proto\"\xd2\x01\n\x07Product\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x12\n\nproduct_id\x18\x02 \x01(\t\x12\x0c\n\x04name\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\r\n\x05price\x18\x05 \x01(\x02\x12\x14\n\x0cis_available\x18\x06 \x01(\x08\x12\x0f\n\x07message\x18\x07 \x01(\t\x12\x15\n\rerror_message\x18\x08 \x01(\t\x12\x1d\n\x06option\x18\t \x01(\x0e\x32\r.SelectOption\x12\x18\n\x10http_status_code\x18\n \x01(\x03\")\n\x0bProductList\x12\x1a\n\x08products\x18\x01 \x03(\x0b\x32\x08.Product*]\n\x0cSelectOption\x12\x07\n\x03GET\x10\x00\x12\x0b\n\x07GET_ALL\x10\x01\x12\x07\n\x03\x41\x44\x44\x10\x02\x12\n\n\x06\x43REATE\x10\x03\x12\n\n\x06UPDATE\x10\x04\x12\n\n\x06REDUCE\x10\x05\x12\n\n\x06\x44\x45LETE\x10\x06\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'product_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _SELECTOPTION._serialized_start=256
-  _SELECTOPTION._serialized_end=328
+  _SELECTOPTION._serialized_start=273
+  _SELECTOPTION._serialized_end=366
   _PRODUCT._serialized_start=18
-  _PRODUCT._serialized_end=211
-  _PRODUCTLIST._serialized_start=213
-  _PRODUCTLIST._serialized_end=254
+  _PRODUCT._serialized_end=228
+  _PRODUCTLIST._serialized_start=230
+  _PRODUCTLIST._serialized_end=271
 # @@protoc_insertion_point(module_scope)

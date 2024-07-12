@@ -185,26 +185,12 @@ async def handle_update_inventory(new_msg):
 
 
 #  Function to handle delete inventory request from producer side from where API is called to delete inventory from database 
-async def handle_delete_inventory(inventory_id):
-    with Session(db.engine) as session:
-        inventory = session.exec(select(Inventory).where(Inventory.inventory_id == inventory_id)).first()
-        if inventory:
-            session.delete(inventory)
-            session.commit()
-            inventory_proto = inventory_pb2.Inventory(
-                error_message=f"Inventory with inventory_id: {inventory_id} deleted!",
-                http_status_code=200
-            )
-            serialized_inventory = inventory_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
-            logger.info(f"Inventory deleted and confirmation sent back: {inventory_proto}")
-        else:
-            inventory_proto = inventory_pb2.Inventory(
-                error_message=f"No Inventory with inventory_id: {inventory_id} found!",
-                http_status_code=400
-            )
-            serialized_inventory = inventory_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
+# async def handle_delete_inventory(inventory_id):
+#     with Session(db.engine) as session:
+#         inventory = session.exec(select(Inventory).where(Inventory.inventory_id == inventory_id)).first()
+#         if inventory:
+#             session.delete(inventory)
+#             session.commit() 
 
 
 #  Function to consume message from the APIs on the producer side and perform functionalities according to the request made by APIs 
@@ -230,8 +216,8 @@ async def consume_message_from_producer_of_inventory():
                 await handle_add_inventory(new_msg)
             elif new_msg.option == inventory_pb2.SelectOption.REDUCE:
                 await handle_reduce_inventory(new_msg)
-            elif new_msg.option == inventory_pb2.SelectOption.DELETE:
-                await handle_delete_inventory(new_msg.inventory_id)
+            # elif new_msg.option == inventory_pb2.SelectOption.DELETE:
+            #     await handle_delete_inventory(new_msg.inventory_id)
             else:
                 logger.warning(f"Unknown option received: {new_msg.option}")
     except Exception as e:
@@ -255,13 +241,19 @@ async def consume_message_from_create_product_of_product():
             new_msg = inventory_pb2.Product()
             new_msg.ParseFromString(msg.value)
             logger.info(f"Received msg.value: {new_msg}")
-
-            inventory = Inventory(
-                product_id = uuid.UUID(new_msg.product_id)
-            )
-            with Session(db.engine) as session:
-                session.add(inventory)
-                session.commit()
+            if new_msg.option == inventory_pb2.SelectOption.CREATE:
+                inventory = Inventory(
+                    product_id = uuid.UUID(new_msg.product_id)
+                )
+                with Session(db.engine) as session:
+                    session.add(inventory)
+                    session.commit()
+            elif new_msg.option == inventory_pb2.SelectOption.DELETE:
+                with Session(db.engine) as session:
+                    inventory = session.exec(select(Inventory).where(Inventory.product_id == new_msg.product_id)).first()
+                    if inventory:
+                        session.delete(inventory)
+                        session.commit()               
     except Exception as e:
         logger.error(f"Error processing message: {e}")
     finally:
@@ -289,19 +281,45 @@ async def consume_message_for_inventory_check():
                 logger.info(f"new_msg received at the consumer on the consumer side of inventory: {inventory}")
                 if inventory:
                     is_product_available = True
-                    if (inventory.stock_level - new_msg.quantity) >= 0:
-                        is_stock_available  = True
-                        inventory.stock_level = inventory.stock_level - new_msg.quantity
-                        inventory.reserved_stock += new_msg.quantity
-                        session.add(inventory)
-                        session.commit()
-                        session.refresh(inventory)
+                    if new_msg.option == inventory_pb2.SelectOption.CREATE: 
+                        if (inventory.stock_level - new_msg.quantity) >= 0:
+                            is_stock_available  = True
+                            inventory.stock_level = inventory.stock_level - new_msg.quantity
+                            inventory.reserved_stock += new_msg.quantity
+                            session.add(inventory)
+                            session.commit()
+                            session.refresh(inventory)
+                        else:
+                            is_stock_available  = False
+                    elif new_msg.option == inventory_pb2.SelectOption.UPDATE:
+    # 3 snarios                                     stock_level reserved_stock 
+    # new_msg.quantity is smaller  3 - 2 = 1 (positive)    +1       -1
+    # new_msg.quantity is larger   3- 4 = -1 (negative)    -1       +1
+    # new_msg.quantity is same     3-3 = 0                 0        0
+
+                        if new_msg.quantity > 0 :
+                            is_stock_available  = True
+                            inventory.stock_level +=  new_msg.quantity
+                            inventory.reserved_stock -= new_msg.quantity
+                            session.add(inventory)
+                            session.commit()
+                        elif new_msg.quantity < 0:
+                            if (inventory.stock_level -(-new_msg.quantity)) >= 0:
+                                is_stock_available  = True
+                                inventory.stock_level -=  (- new_msg.quantity)
+                                inventory.reserved_stock += (- new_msg.quantity)
+                                session.add(inventory)
+                                session.commit()
+                            else:
+                                is_stock_available  = False
+                        elif new_msg.quantity == 0:
+                                is_stock_available  = True
+
                     else:
-                        is_stock_available  = False
+                        logger.warning(f"Unknown option received: {new_msg.option}")
                 else:
                     is_product_available = False
                     is_stock_available  = False
-
                 logger.info(f"is_stock_available: {is_stock_available}")
                 logger.info(f"is_product_available: {is_stock_available}")
                 inventory_check_proto = inventory_pb2.Order(

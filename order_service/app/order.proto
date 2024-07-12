@@ -3,9 +3,11 @@ syntax = "proto3";
 enum SelectOption {
     GET = 0;
     GET_ALL = 1;
-    CREATE = 2;
-    UPDATE = 3;
-    DELETE = 4;
+    ADD = 2;
+    CREATE = 3;
+    UPDATE = 4;
+    REDUCE = 5;
+    DELETE = 6;
 }
 
 

@@ -189,25 +189,45 @@ async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotate
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
     order_proto = await consume_message_response_get()
+    if order_proto.quantity is None:
+        order_proto.quantity = 0
     if order_proto.error_message and order_proto.http_status_code:
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     elif order_proto.error_message :
-        return {"Order not creted": f"{order_proto.error_message}"}
+        return {"Order not created": f"{order_proto.error_message}"}
     else:
-        return{"Order Created": MessageToDict(order_proto)}
+        return{"Order Created":{                    
+                    "id":order_proto.id,
+                    "order_id" : str(order_proto.order_id),
+                    "product_id":str(order_proto.product_id),
+                    "quantity":order_proto.quantity,
+                    "shipping_address":order_proto.shipping_address,
+                    "customer_notes":order_proto.customer_notes
+                    }}
 
 
 #  Endpoint to update order to database 
 @app.put("/orders/{order_id}", response_model = dict)
-async  def update_order (order_id:UUID, order:Orders , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    order_proto = order_pb2.Order(order_id= str(order_id), name = order.name, description = order.description ,price = order.price , is_available = order.is_available, option = order_pb2.SelectOption.UPDATE)
+async  def update_order (order_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+    order_proto = order_pb2.Order(order_id= str(order_id), quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes, option = order_pb2.SelectOption.UPDATE)
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
     order_proto = await consume_message_response_get()
-    if order_proto.error_message or order_proto.http_status_code :
+    if order_proto.quantity is None:
+        order_proto.quantity = 0
+    if order_proto.error_message and order_proto.http_status_code:
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
+    elif order_proto.error_message :
+        return {"Order not created": f"{order_proto.error_message}"}
     else:
-        return{"Updated Message": MessageToDict(order_proto)}
+        return{"Order Updated": {                    
+                    "id":order_proto.id,
+                    "order_id" : str(order_proto.order_id),
+                    "product_id":str(order_proto.product_id),
+                    "quantity":order_proto.quantity,
+                    "shipping_address":order_proto.shipping_address,
+                    "customer_notes":order_proto.customer_notes
+                                }}
 
 
 #  Endpoint to delete order from database 

@@ -44,9 +44,9 @@ async def produce_message(topic, message):
         await producer.stop()
 
 #  Function to handle get all products request from producer side from where API is called to get all products 
-async def handle_get_all_products():
+async def handle_get_all_orders():
     with Session(db.engine) as session:
-        products_list = session.exec(select(Order)).all()
+        products_list = session.exec(select(Orders)).all()
         product_list_proto = order_pb2.ProductList()
         for product in products_list:
             product_proto = order_pb2.Order(
@@ -64,9 +64,9 @@ async def handle_get_all_products():
 
 
 #  Function to handle get product request from producer side from where API is called to get a products 
-async def handle_get_product(product_id):
+async def handle_get_order(product_id):
     with Session(db.engine) as session:
-        product = session.exec(select(Order).where(Order.order_id == product_id)).first()
+        product = session.exec(select(Orders).where(Orders.order_id == product_id)).first()
         if product:
             product_proto = order_pb2.Order(
                 id=product.id,
@@ -87,6 +87,8 @@ async def handle_get_product(product_id):
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
 
+
+##################################### ADD ORDER #######################################
 #  Function to consume message from inventory for inventory check 
 async def consume_message_from_inventory_check():
     consumer = AIOKafkaConsumer(
@@ -111,10 +113,11 @@ async def consume_message_from_inventory_check():
 
 
 #  Function to handle inventory check 
-async def handle_inventory_check(product_id,quantity):
+async def handle_inventory_check(product_id,quantity,option):
             inventory_check_proto = order_pb2.Order(
             product_id=str(product_id),
-            quantity = quantity
+            quantity = quantity,
+            option = option
             )
             serialized_inventory_check = inventory_check_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_INVENTORY_CHECK_REQUEST, serialized_inventory_check)
@@ -130,7 +133,7 @@ async def handle_create_order(new_msg):
         shipping_address=new_msg.shipping_address,
         customer_notes=new_msg.customer_notes
     )
-    inventory_check = await handle_inventory_check(order.product_id, order.quantity)
+    inventory_check = await handle_inventory_check(order.product_id, order.quantity,order_pb2.SelectOption.CREATE)
     logger.info(f"Inventory check value  :{inventory_check}")
     if inventory_check.is_product_available:
         if inventory_check.is_stock_available:
@@ -174,42 +177,75 @@ async def handle_create_order(new_msg):
         
 
 
-#  Function to handle update product request from producer side from where API is called to update product to database 
-async def handle_update_product(new_msg):
+
+##################################### Update ORDER ################################
+
+#  Function to handle update order request from producer side from where API is called to update order to database 
+async def handle_update_order(new_msg):
     with Session(db.engine) as session:
-        product = session.exec(select(Product).where(Product.product_id == new_msg.product_id)).first()
-        if product:
-            product.name = new_msg.name
-            product.description = new_msg.description
-            product.price = new_msg.price
-            product.is_available = new_msg.is_available
-            session.add(product)
-            session.commit()
-            session.refresh(product)
-            product_proto = order_pb2.Order(
-                id=product.id,
-                product_id=str(product.product_id),
-                name=product.name,
-                description=product.description,
-                price=product.price,
-                is_available=product.is_available,
-            )
-            serialized_product = product_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
-            logger.info(f"Product updated in database and sent back: {product_proto}")
+        order = session.exec(select(Orders).where(Orders.order_id == new_msg.order_id)).first()
+        logger.info(f"order: {order}")
+        if order:
+            new_quantity =order.quantity - new_msg.quantity
+            #  Logic
+
+            # 3 snarios                                     stock_level reserved_stock 
+            # new_msg.quantity is smaller  3 - 2 = 1 (positive)    +1       -1
+            # new_msg.quantity is larger   3- 4 = -1 (negative)    -1       +1
+            # new_msg.quantity is same     3-3 = 0                 0        0
+
+            inventory_check = await handle_inventory_check(order.product_id, new_quantity, order_pb2.SelectOption.UPDATE)
+            if inventory_check.is_stock_available:
+                logger.info(f"What is the value of new_msg.quantity: {new_msg.quantity}")
+                if new_msg.quantity >= 0:
+                    order.quantity = new_msg.quantity
+                if new_msg.shipping_address:
+                    order.shipping_address = new_msg.shipping_address
+                if new_msg.customer_notes:
+                    order.customer_notes = new_msg.customer_notes 
+                session.add(order)
+                session.commit()
+                session.refresh(order)
+                if order:
+                    logger.info(f"Order added to database: {order}")
+                    order_proto = order_pb2.Order(
+                    id=order.id,
+                    order_id = str(order.order_id),
+                    product_id=str(order.product_id),
+                    quantity=order.quantity,
+                    shipping_address=order.shipping_address,
+                    customer_notes=order.customer_notes,
+                    )
+                    serialized_order = order_proto.SerializeToString()
+                    await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+                    logger.info(f"Order updated in database and sent back: {order_proto}")
+                else:
+                    order_proto = order_pb2.Order(
+                        error_message=f"No order having product_id: {new_msg.product_id} updated! because of database issue",
+                        http_status_code=404
+                    )
+                    serialized_order = order_proto.SerializeToString()
+                    await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+            else:
+                order_proto = order_pb2.Order(
+                    error_message=f"Requested Quantity of product is not available",
+                )
+                serialized_order = order_proto.SerializeToString()
+                await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)   
         else:
-            product_proto = order_pb2.Order(
-                error_message=f"No Product with product_id: {new_msg.product_id} found!",
-                http_status_code=400
+            order_proto = order_pb2.Order(
+                error_message=f"No order with order_id : {new_msg.order_id} is available for sale",
             )
-            serialized_product = product_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+            serialized_order = order_proto.SerializeToString()
+            await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+
+                
 
 
 #  Function to handle delete product request from producer side from where API is called to delete product from database 
-async def handle_delete_product(product_id):
+async def handle_delete_order(product_id):
     with Session(db.engine) as session:
-        product = session.exec(select(Product).where(Product.product_id == product_id)).first()
+        product = session.exec(select(Orders).where(Orders.product_id == product_id)).first()
         if product:
             session.delete(product)
             session.commit()
@@ -244,16 +280,22 @@ async def consume_message_request():
             new_msg.ParseFromString(msg.value)
             logger.info(f"Received message: {new_msg}")
 
+            if new_msg.quantity is None:
+                new_msg.quantity = 0
+            
+            logger.info(f"new_msg.quantity: {new_msg.quantity}")
+            
+
             if new_msg.option == order_pb2.SelectOption.GET_ALL:
-                await handle_get_all_products()
+                await handle_get_all_orders()
             elif new_msg.option == order_pb2.SelectOption.GET:
-                await handle_get_product(new_msg.product_id)
+                await handle_get_order(new_msg.product_id)
             elif new_msg.option == order_pb2.SelectOption.CREATE:
                 await handle_create_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.UPDATE:
-                await handle_update_product(new_msg)
+                await handle_update_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.DELETE:
-                await handle_delete_product(new_msg.product_id)
+                await handle_delete_order(new_msg.product_id)
             else:
                 logger.warning(f"Unknown option received: {new_msg.option}")
     except Exception as e:

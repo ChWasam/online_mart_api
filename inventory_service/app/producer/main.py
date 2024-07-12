@@ -105,8 +105,8 @@ class Inventory(SQLModel):
     reserved_stock:int = Field(index=True)
 
 
-class Inventory_post(SQLModel):
-    add_to_stock_level:int = Field(index=True)
+class InventoryPost(SQLModel):
+    update_stock_level:int = Field(index=True)
 
 
 #  Function to produce message. I will work as a dependency injection for APIs
@@ -187,11 +187,11 @@ async def get_a_inventory(inventory_id:UUID, producer:Annotated[AIOKafkaProducer
 
 
 #  Endpoint to add inventory to database 
-@app.post("/inventory/{product_id}/add/{add_stock_level}", response_model=dict)
-async  def add_inventory (product_id:UUID, add_stock_level:int , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+@app.put("/inventory/{product_id}/add", response_model=dict)
+async  def add_inventory (product_id:UUID, add_stock_level:InventoryPost , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     inventory_proto = inventory_pb2.Inventory(
         product_id = str(product_id),
-        add_stock_level = add_stock_level,
+        add_stock_level = add_stock_level.update_stock_level,
         option = inventory_pb2.SelectOption.ADD)
     serialized_inventory = inventory_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC_INVENTORY}",serialized_inventory)
@@ -209,11 +209,11 @@ async  def add_inventory (product_id:UUID, add_stock_level:int , producer:Annota
 
 
 #  Endpoint to reduce inventory from database 
-@app.post("/inventory/{product_id}/reduce/{reduce_stock_level}", response_model=dict)
-async  def reduce_inventory (product_id:UUID, reduce_stock_level:int , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+@app.put("/inventory/{product_id}/reduce", response_model=dict)
+async  def reduce_inventory (product_id:UUID, reduce_stock_level:InventoryPost , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     inventory_proto = inventory_pb2.Inventory(
         product_id = str(product_id),
-        reduce_stock_level = reduce_stock_level,
+        reduce_stock_level = reduce_stock_level.update_stock_level,
         option = inventory_pb2.SelectOption.REDUCE)
     logger.info(f"Initial detail send to consumer for reducing stock option {inventory_proto}")    
     serialized_inventory = inventory_proto.SerializeToString()
@@ -229,30 +229,14 @@ async  def reduce_inventory (product_id:UUID, reduce_stock_level:int , producer:
                 "stock_level":inventory_proto.stock_level,
                 "reserved_stock":inventory_proto.reserved_stock,
         }
-#  Endpoint to update inventory to database 
-@app.put("/inventorys/{inventory_id}", response_model = dict)
-async  def update_inventory (inventory_id:UUID, inventory:Inventory , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    inventory_proto = inventory_pb2.Inventory(inventory_id= str(inventory_id), name = inventory.name, description = inventory.description ,price = inventory.price , is_available = inventory.is_available, option = inventory_pb2.SelectOption.UPDATE)
-    serialized_inventory = inventory_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC_INVENTORY}",serialized_inventory)
-    inventory_proto = await consume_message_response()
-    if inventory_proto.error_message or inventory_proto.http_status_code :
-        raise HTTPException(status_code=inventory_proto.http_status_code, detail=inventory_proto.error_message)
-    else:
-        return{"Updated Message": MessageToDict(inventory_proto)}
-
 
 #  Endpoint to delete inventory from database 
-@app.delete("/inventorys/{inventory_id}", response_model=dict)
-async  def delete_inventory (inventory_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    inventory_proto = inventory_pb2.Inventory(inventory_id= str(inventory_id), option = inventory_pb2.SelectOption.DELETE)
-    serialized_inventory = inventory_proto.SerializeToString()
-    await producer.send_and_wait(f"{settings.KAFKA_TOPIC_INVENTORY}",serialized_inventory)
-    inventory_proto = await consume_message_response()
-    if inventory_proto.error_message or inventory_proto.http_status_code :
-        raise HTTPException(status_code=inventory_proto.http_status_code, detail=inventory_proto.error_message)
-    else:
-        return{"Updated Message": inventory_proto.error_message }
+# @app.delete("/inventorys/{inventory_id}", response_model=dict)
+# async  def delete_inventory (inventory_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+#     inventory_proto = inventory_pb2.Inventory(inventory_id= str(inventory_id), option = inventory_pb2.SelectOption.DELETE)
+#     serialized_inventory = inventory_proto.SerializeToString()
+#     await producer.send_and_wait(f"{settings.KAFKA_TOPIC_INVENTORY}",serialized_inventory)
+#     return {"Delete  Message": "Message Deleted"}
 
 
 
