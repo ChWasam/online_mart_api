@@ -104,7 +104,18 @@ class Product(SQLModel):
     name:str = Field(index=True)
     description:str = Field(index=True)
     price:float= Field(index=True)
-    is_available: bool = Field(default=True)
+    is_available: bool = Field(default=False)
+
+class ProductUpdateDelete(SQLModel):
+
+    name:str = Field(index=True)
+    description:str = Field(index=True)
+    price:float= Field(index=True)
+    is_available: bool = Field(default=False)
+
+
+
+
 
 #  Function to produce message. I will work as a dependency injection for APIs
 async def produce_message():
@@ -176,7 +187,7 @@ async def get_a_product(product_id:UUID, producer:Annotated[AIOKafkaProducer,Dep
 
 #  Endpoint to add product to database 
 @app.post("/products", response_model=dict)
-async  def add_product (product:Product , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+async  def add_product (product:ProductUpdateDelete , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     product_proto = product_pb2.Product(name = product.name, description = product.description , price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.CREATE)
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
@@ -200,7 +211,7 @@ async  def add_product (product:Product , producer:Annotated[AIOKafkaProducer,De
 
 #  Endpoint to update product to database 
 @app.put("/products/{product_id}", response_model = dict)
-async  def update_product (product_id:UUID, product:Product , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+async  def update_product (product_id:UUID, product:ProductUpdateDelete , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     product_proto = product_pb2.Product(product_id= str(product_id), name = product.name, description = product.description ,price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.UPDATE)
     serialized_product = product_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_product)
@@ -223,8 +234,6 @@ async  def delete_product (product_id:UUID, producer:Annotated[AIOKafkaProducer,
         return {"Product Deleted " : product_proto.message }
     elif product_proto.error_message or product_proto.http_status_code :
         raise HTTPException(status_code=product_proto.http_status_code, detail=product_proto.error_message)
-
-
     else:
         return{"Product not deleted ": product_proto.error_message }
 

@@ -240,28 +240,29 @@ async def handle_update_order(new_msg):
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
 
                 
+##################################### Update ORDER ################################
 
 
 #  Function to handle delete product request from producer side from where API is called to delete product from database 
-async def handle_delete_order(product_id):
+async def handle_delete_order(order_id):
     with Session(db.engine) as session:
-        product = session.exec(select(Orders).where(Orders.product_id == product_id)).first()
-        if product:
-            session.delete(product)
+        order = session.exec(select(Orders).where(Orders.order_id == order_id)).first()
+        if order:
+            inventory_check = await handle_inventory_check(order.product_id, order.quantity, order_pb2.SelectOption.DELETE)
+            session.delete(order)
             session.commit()
-            product_proto = order_pb2.Order(
-                error_message=f"Product with product_id: {product_id} deleted!",
-                http_status_code=200
+            order_proto = order_pb2.Order(
+                message=f"Order with order_id: {order_id} deleted!",
             )
-            serialized_product = product_proto.SerializeToString()
+            serialized_product = order_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
-            logger.info(f"Product deleted and confirmation sent back: {product_proto}")
+            logger.info(f"Order deleted and confirmation sent back: {order_proto}")
         else:
-            product_proto = order_pb2.Order(
-                error_message=f"No Product with product_id: {product_id} found!",
-                http_status_code=400
+            order_proto = order_pb2.Order(
+                error_message=f"No Order with order_id: {order_id} found!",
+                http_status_code=404
             )
-            serialized_product = product_proto.SerializeToString()
+            serialized_product = order_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
 
 
@@ -282,10 +283,9 @@ async def consume_message_request():
 
             if new_msg.quantity is None:
                 new_msg.quantity = 0
-            
+
             logger.info(f"new_msg.quantity: {new_msg.quantity}")
             
-
             if new_msg.option == order_pb2.SelectOption.GET_ALL:
                 await handle_get_all_orders()
             elif new_msg.option == order_pb2.SelectOption.GET:
@@ -295,7 +295,7 @@ async def consume_message_request():
             elif new_msg.option == order_pb2.SelectOption.UPDATE:
                 await handle_update_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.DELETE:
-                await handle_delete_order(new_msg.product_id)
+                await handle_delete_order(new_msg.order_id)
             else:
                 logger.warning(f"Unknown option received: {new_msg.option}")
     except Exception as e:

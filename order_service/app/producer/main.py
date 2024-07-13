@@ -237,11 +237,12 @@ async  def delete_order (order_id:UUID, producer:Annotated[AIOKafkaProducer,Depe
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
     order_proto = await consume_message_response_get()
-    if order_proto.error_message or order_proto.http_status_code :
+    if order_proto.message:
+        return {"Order Deleted " : order_proto.message }
+    elif order_proto.error_message or order_proto.http_status_code :
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     else:
-        return{"Updated Message": order_proto.error_message }
-
+        return{"Order not deleted ": order_proto.error_message }
 
 
 

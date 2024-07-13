@@ -19,7 +19,7 @@ class Product(SQLModel, table=True):
     name: str = Field(index=True)
     description: str = Field(index=True)
     price: float = Field(index=True)
-    is_available: bool = Field(default=True)
+    is_available: bool = Field(default=False)
 
 # Retry utility
 async def retry_async(func, retries=5, delay=2, *args, **kwargs):

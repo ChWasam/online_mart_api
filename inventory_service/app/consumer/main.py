@@ -314,12 +314,19 @@ async def consume_message_for_inventory_check():
                                 is_stock_available  = False
                         elif new_msg.quantity == 0:
                                 is_stock_available  = True
-
+                    
+                    elif new_msg.option == inventory_pb2.SelectOption.DELETE:
+                            inventory.stock_level +=  new_msg.quantity
+                            inventory.reserved_stock -= new_msg.quantity
+                            session.add(inventory)
+                            session.commit()
+                            is_stock_available  = True
                     else:
                         logger.warning(f"Unknown option received: {new_msg.option}")
                 else:
                     is_product_available = False
                     is_stock_available  = False
+
                 logger.info(f"is_stock_available: {is_stock_available}")
                 logger.info(f"is_product_available: {is_stock_available}")
                 inventory_check_proto = inventory_pb2.Order(

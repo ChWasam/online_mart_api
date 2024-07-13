@@ -51,9 +51,10 @@ message Order {
     int64 stock_level = 7;
     bool is_product_available = 8;
     bool is_stock_available  = 9;
-    string error_message = 10;
-    SelectOption option =11;
-    int64 http_status_code = 12;
+    string message = 10;
+    string error_message = 11;
+    SelectOption option =12;
+    int64 http_status_code = 13;
 }
 
 message InventoryList {
