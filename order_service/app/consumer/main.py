@@ -43,49 +43,49 @@ async def produce_message(topic, message):
     finally:
         await producer.stop()
 
-#  Function to handle get all products request from producer side from where API is called to get all products 
+#  Function to handle get all orders request from producer side from where API is called to get all orders 
 async def handle_get_all_orders():
     with Session(db.engine) as session:
-        products_list = session.exec(select(Orders)).all()
-        product_list_proto = order_pb2.ProductList()
-        for product in products_list:
-            product_proto = order_pb2.Order(
-                id=product.id,
-                product_id=str(product.product_id),
-                name=product.name,
-                description=product.description,
-                price=product.price,
-                is_available=product.is_available,
+        orders_list = session.exec(select(Orders)).all()
+        orders_list_proto = order_pb2.OrderList()
+        for order in orders_list:
+            order_proto = order_pb2.Order(
+                id=order.id,
+                order_id=str(order.order_id) ,
+                product_id=str(order.product_id),
+                quantity=order.quantity,
+                shipping_address=order.shipping_address,
+                customer_notes=order.customer_notes,
             )
-            product_list_proto.products.append(product_proto)
-        serialized_product_list = product_list_proto.SerializeToString()
-        await produce_message(settings.KAFKA_TOPIC_GET, serialized_product_list)
-        logger.info(f"List of products sent back from database: {product_list_proto}")
+            orders_list_proto.orders.append(order_proto)
+        serialized_order_list = orders_list_proto.SerializeToString()
+        await produce_message(settings.KAFKA_TOPIC_GET, serialized_order_list )
+        logger.info(f"List of orders sent back from database: {orders_list_proto}")
 
 
-#  Function to handle get product request from producer side from where API is called to get a products 
-async def handle_get_order(product_id):
+#  Function to handle get order request from producer side from where API is called to get an order 
+async def handle_get_order(order_id):
     with Session(db.engine) as session:
-        product = session.exec(select(Orders).where(Orders.order_id == product_id)).first()
-        if product:
-            product_proto = order_pb2.Order(
-                id=product.id,
-                product_id=str(product.product_id),
-                name=product.name,
-                description=product.description,
-                price=product.price,
-                is_available=product.is_available,
+        order = session.exec(select(Orders).where(Orders.order_id == order_id)).first()
+        if order:
+            order_proto = order_pb2.Order(
+                id=order.id,
+                order_id=str(order.order_id) ,
+                product_id=str(order.product_id),
+                quantity=order.quantity,
+                shipping_address=order.shipping_address,
+                customer_notes=order.customer_notes,
             )
-            serialized_product = product_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
-            logger.info(f"Product sent back from database: {product_proto}")
+            serialized_order = order_proto.SerializeToString()
+            await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+            logger.info(f"Order sent back from database: {order_proto}")
         else:
-            product_proto = order_pb2.Order(
-                error_message=f"No Product with product_id: {product_id} found!",
+            order_proto = order_pb2.Order(
+                error_message=f"No Order with order_id: {order_id} found!",
                 http_status_code=400
             )
-            serialized_product = product_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+            serialized_order = order_proto.SerializeToString()
+            await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
 
 
 ##################################### ADD ORDER #######################################
@@ -289,7 +289,7 @@ async def consume_message_request():
             if new_msg.option == order_pb2.SelectOption.GET_ALL:
                 await handle_get_all_orders()
             elif new_msg.option == order_pb2.SelectOption.GET:
-                await handle_get_order(new_msg.product_id)
+                await handle_get_order(new_msg.order_id)
             elif new_msg.option == order_pb2.SelectOption.CREATE:
                 await handle_create_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.UPDATE:

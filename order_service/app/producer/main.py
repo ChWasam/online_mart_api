@@ -64,7 +64,7 @@ async def consume_message_response_get_all():
         async for msg in consumer:
             logger.info(f"message from consumer : {msg}")
             try:
-                new_msg = order_pb2.orderList()
+                new_msg = order_pb2.OrderList()
                 new_msg.ParseFromString(msg.value)
                 logger.info(f"new_msg on producer side:{new_msg}")
                 return new_msg
@@ -157,12 +157,12 @@ async def get_all_orders(producer:Annotated[AIOKafkaProducer,Depends(produce_mes
 
     order_list = [
         {
-            "id":order.id,
-            "order_id":str(order.order_id),
-            "name":order.name,
-            "description":order.description,
-            "price":order.price,
-            "is_available":order.is_available,
+                "id":order.id,
+                "order_id":str(order.order_id) ,
+                "product_id":str(order.product_id),
+                "quantity":order.quantity,
+                'shipping_address':order.shipping_address,
+                "customer_notes":order.customer_notes,
         }
         for order in order_list_proto.orders
     ]
@@ -179,7 +179,14 @@ async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends
     if order_proto.error_message or order_proto.http_status_code :
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     else:
-        return MessageToDict(order_proto)
+        return {
+                "id":order_proto.id,
+                "order_id":str(order_proto.order_id) ,
+                "product_id":str(order_proto.product_id),
+                "quantity":order_proto.quantity,
+                'shipping_address':order_proto.shipping_address,
+                "customer_notes":order_proto.customer_notes,
+        }
 
 
 #  Endpoint to add order to database 
@@ -207,7 +214,7 @@ async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotate
 
 
 #  Endpoint to update order to database 
-@app.put("/orders/{order_id}", response_model = dict)
+@app.put("/order/{order_id}", response_model = dict)
 async  def update_order (order_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     order_proto = order_pb2.Order(order_id= str(order_id), quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes, option = order_pb2.SelectOption.UPDATE)
     serialized_order = order_proto.SerializeToString()
@@ -231,7 +238,7 @@ async  def update_order (order_id:UUID, order:OrdersInputField , producer:Annota
 
 
 #  Endpoint to delete order from database 
-@app.delete("/orders/{order_id}", response_model=dict)
+@app.delete("/order/{order_id}", response_model=dict)
 async  def delete_order (order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     order_proto = order_pb2.Order(order_id= str(order_id), option = order_pb2.SelectOption.DELETE)
     serialized_order = order_proto.SerializeToString()

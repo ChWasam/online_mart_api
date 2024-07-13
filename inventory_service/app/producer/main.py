@@ -125,13 +125,9 @@ async def lifespan(app: FastAPI):
     db.create_table()
     await create_topic()
     loop = asyncio.get_event_loop()
-    
     task1 = loop.create_task(main.consume_message_from_producer_of_inventory())
     task2 = loop.create_task(main.consume_message_from_create_product_of_product())
     task3 = loop.create_task(main.consume_message_for_inventory_check())
-
-    
-    
     try:
         yield
     finally:
@@ -152,7 +148,7 @@ async def read_root():
 
 # Endpoint to get all the inventorys
 @app.get("/inventory", response_model= list[Inventory])
-async def get_all_inventorys(producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+async def get_all_inventories(producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     inventory_proto = inventory_pb2.Inventory(option = inventory_pb2.SelectOption.GET_ALL)
     serialized_inventory = inventory_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC_INVENTORY}",serialized_inventory)
@@ -160,15 +156,14 @@ async def get_all_inventorys(producer:Annotated[AIOKafkaProducer,Depends(produce
 
     inventory_list = [
         {
-            "id":inventory.id,
-            "inventory_id":str(inventory.inventory_id),
-            "name":inventory.name,
-            "description":inventory.description,
-            "price":inventory.price,
-            "is_available":inventory.is_available,
+                "id":inventory.id,
+                "inventory_id":str(inventory.inventory_id),
+                "product_id" : str(inventory.product_id),
+                "stock_level":inventory.stock_level,
+                "reserved_stock":inventory.reserved_stock,
 
         }
-        for inventory in inventory_list_proto.inventorys
+        for inventory in inventory_list_proto.inventories
     ]
     return inventory_list
 
@@ -183,7 +178,14 @@ async def get_a_inventory(inventory_id:UUID, producer:Annotated[AIOKafkaProducer
     if inventory_proto.error_message or inventory_proto.http_status_code :
         raise HTTPException(status_code=inventory_proto.http_status_code, detail=inventory_proto.error_message)
     else:
-        return MessageToDict(inventory_proto)
+        return         {
+                "id":inventory_proto.id,
+                "inventory_id":str(inventory_proto.inventory_id),
+                "product_id" : str(inventory_proto.product_id),
+                "stock_level":inventory_proto.stock_level,
+                "reserved_stock":inventory_proto.reserved_stock,
+
+        }
 
 
 #  Endpoint to add inventory to database 

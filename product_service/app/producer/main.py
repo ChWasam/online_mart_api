@@ -141,7 +141,7 @@ async def lifespan(app: FastAPI):
         for task in [task1,task2]:
             task.cancel()
             await task
-            
+
 # Home Endpoint
 app:FastAPI = FastAPI(lifespan=lifespan )
 @app.get("/")
@@ -172,7 +172,7 @@ async def get_all_products(producer:Annotated[AIOKafkaProducer,Depends(produce_m
 
 
 #  Endpoint to get the single product based on endpoint 
-@app.get("/products/{product_id}", response_model=dict)
+@app.get("/product/{product_id}", response_model=dict)
 async def get_a_product(product_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     product_proto = product_pb2.Product(product_id =str(product_id),  option = product_pb2.SelectOption.GET)
     serialized_product = product_proto.SerializeToString()
@@ -185,7 +185,7 @@ async def get_a_product(product_id:UUID, producer:Annotated[AIOKafkaProducer,Dep
         return MessageToDict(product_proto)
 
 #  Endpoint to add product to database 
-@app.post("/products", response_model=dict)
+@app.post("/product", response_model=dict)
 async  def add_product (product:ProductUpdateDelete , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     product_proto = product_pb2.Product(name = product.name, description = product.description , price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.CREATE)
     serialized_product = product_proto.SerializeToString()
@@ -209,7 +209,7 @@ async  def add_product (product:ProductUpdateDelete , producer:Annotated[AIOKafk
 
 
 #  Endpoint to update product to database 
-@app.put("/products/{product_id}", response_model = dict)
+@app.put("/product/{product_id}", response_model = dict)
 async  def update_product (product_id:UUID, product:ProductUpdateDelete , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     product_proto = product_pb2.Product(product_id= str(product_id), name = product.name, description = product.description ,price = product.price , is_available = product.is_available, option = product_pb2.SelectOption.UPDATE)
     serialized_product = product_proto.SerializeToString()
@@ -222,7 +222,7 @@ async  def update_product (product_id:UUID, product:ProductUpdateDelete , produc
 
 
 #  Endpoint to delete product from database 
-@app.delete("/products/{product_id}", response_model=dict)
+@app.delete("/product/{product_id}", response_model=dict)
 async  def delete_product (product_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     product_proto = product_pb2.Product(product_id= str(product_id), option = product_pb2.SelectOption.DELETE)
     serialized_product = product_proto.SerializeToString()

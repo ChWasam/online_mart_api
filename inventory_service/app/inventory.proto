@@ -58,5 +58,5 @@ message Order {
 }
 
 message InventoryList {
-    repeated Inventory Inventories = 1;
+    repeated Inventory inventories = 1;
 }

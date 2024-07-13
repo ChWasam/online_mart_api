@@ -28,5 +28,5 @@ message Order {
 }
 
 message OrderList {
-    repeated Order Orders = 1;
+    repeated Order orders = 1;
 }

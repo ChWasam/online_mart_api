@@ -43,20 +43,19 @@ async def produce_message(topic, message):
         await producer.stop()
 
 #  Function to handle get all inventorys request from producer side from where API is called to get all inventorys 
-async def handle_get_all_inventorys():
+async def handle_get_all_inventories():
     with Session(db.engine) as session:
-        inventorys_list = session.exec(select(Inventory)).all()
-        inventory_list_proto = inventory_pb2.ProductList()
-        for inventory in inventorys_list:
+        inventories_list = session.exec(select(Inventory)).all()
+        inventory_list_proto = inventory_pb2.InventoryList()
+        for inventory in inventories_list:
             inventory_proto = inventory_pb2.Inventory(
                 id=inventory.id,
                 inventory_id=str(inventory.inventory_id),
-                name=inventory.name,
-                description=inventory.description,
-                price=inventory.price,
-                is_available=inventory.is_available,
+                product_id = str(inventory.product_id),
+                stock_level=inventory.stock_level,
+                reserved_stock=inventory.reserved_stock,
             )
-            inventory_list_proto.inventorys.append(inventory_proto)
+            inventory_list_proto.inventories.append(inventory_proto)
         serialized_inventory_list = inventory_list_proto.SerializeToString()
         await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory_list)
         logger.info(f"List of inventorys sent back from database: {inventory_list_proto}")
@@ -70,10 +69,9 @@ async def handle_get_inventory(inventory_id):
             inventory_proto = inventory_pb2.Inventory(
                 id=inventory.id,
                 inventory_id=str(inventory.inventory_id),
-                name=inventory.name,
-                description=inventory.description,
-                price=inventory.price,
-                is_available=inventory.is_available,
+                product_id = str(inventory.product_id),
+                stock_level=inventory.stock_level,
+                reserved_stock=inventory.reserved_stock,
             )
             serialized_inventory = inventory_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
@@ -81,13 +79,13 @@ async def handle_get_inventory(inventory_id):
         else:
             inventory_proto = inventory_pb2.Inventory(
                 error_message=f"No Inventory with inventory_id: {inventory_id} found!",
-                http_status_code=400
+                http_status_code=404
             )
             serialized_inventory = inventory_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
 
 
-#  Function to handle add  inventory request from producer side from where API is called to add inventory to database 
+#  Function to handle add inventory request from producer side from where API is called to add inventory to database 
 async def handle_add_inventory(new_msg):
     with Session(db.engine) as session:
         inventory = session.exec(select(Inventory).where(Inventory.product_id == new_msg.product_id)).first()
@@ -211,7 +209,7 @@ async def consume_message_from_producer_of_inventory():
             logger.info(f"Received message: {new_msg}")
 
             if new_msg.option == inventory_pb2.SelectOption.GET_ALL:
-                await handle_get_all_inventorys()
+                await handle_get_all_inventories()
             elif new_msg.option == inventory_pb2.SelectOption.GET:
                 await handle_get_inventory(new_msg.inventory_id)
             elif new_msg.option == inventory_pb2.SelectOption.ADD:
@@ -334,8 +332,6 @@ async def consume_message_for_inventory_check():
                                 )
                                 serialized_inventory = inventory_proto.SerializeToString()
                                 await produce_message(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory)                                
-
-
                             else:
                                 is_stock_available  = False
                         elif new_msg.quantity == 0:
