@@ -109,6 +109,7 @@ async def handle_add_inventory(new_msg):
             )
             serialized_inventory = inventory_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
+            await produce_message(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory)
             logger.info(f"Inventory sent back from database: {inventory_proto}")
         else:
             inventory_proto = inventory_pb2.Inventory(
@@ -141,6 +142,7 @@ async def handle_reduce_inventory(new_msg):
             )
             serialized_inventory = inventory_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
+            await produce_message(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory)
             logger.info(f"Inventory sent back from database: {inventory_proto}")
         else:
             inventory_proto = inventory_pb2.Inventory(
@@ -154,34 +156,34 @@ async def handle_reduce_inventory(new_msg):
 
 
 #  Function to handle update inventory request from producer side from where API is called to update inventory to database 
-async def handle_update_inventory(new_msg):
-    with Session(db.engine) as session:
-        inventory = session.exec(select(Inventory).where(Inventory.inventory_id == new_msg.inventory_id)).first()
-        if inventory:
-            inventory.name = new_msg.name
-            inventory.description = new_msg.description
-            inventory.price = new_msg.price
-            inventory.is_available = new_msg.is_available
-            session.add(inventory)
-            session.commit()
-            session.refresh(inventory)
-            inventory_proto = inventory_pb2.Inventory(
-                id=inventory.id,
-                inventory_id=str(inventory.inventory_id),
-                product_id = str(inventory.product_id),
-                stock_level=inventory.stock_level,
-                reserved_stock=inventory.reserved_stock,
-            )
-            serialized_inventory = inventory_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
-            logger.info(f"Inventory updated in database and sent back: {inventory_proto}")
-        else:
-            inventory_proto = inventory_pb2.Inventory(
-                error_message=f"No Inventory with inventory_id: {new_msg.inventory_id} found!",
-                http_status_code=404
-            )
-            serialized_inventory = inventory_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
+# async def handle_update_inventory(new_msg):
+#     with Session(db.engine) as session:
+#         inventory = session.exec(select(Inventory).where(Inventory.inventory_id == new_msg.inventory_id)).first()
+#         if inventory:
+#             inventory.name = new_msg.name
+#             inventory.description = new_msg.description
+#             inventory.price = new_msg.price
+#             inventory.is_available = new_msg.is_available
+#             session.add(inventory)
+#             session.commit()
+#             session.refresh(inventory)
+#             inventory_proto = inventory_pb2.Inventory(
+#                 id=inventory.id,
+#                 inventory_id=str(inventory.inventory_id),
+#                 product_id = str(inventory.product_id),
+#                 stock_level=inventory.stock_level,
+#                 reserved_stock=inventory.reserved_stock,
+#             )
+#             serialized_inventory = inventory_proto.SerializeToString()
+#             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
+#             logger.info(f"Inventory updated in database and sent back: {inventory_proto}")
+#         else:
+#             inventory_proto = inventory_pb2.Inventory(
+#                 error_message=f"No Inventory with inventory_id: {new_msg.inventory_id} found!",
+#                 http_status_code=404
+#             )
+#             serialized_inventory = inventory_proto.SerializeToString()
+#             await produce_message(settings.KAFKA_TOPIC_GET, serialized_inventory)
 
 
 #  Function to handle delete inventory request from producer side from where API is called to delete inventory from database 
@@ -289,6 +291,13 @@ async def consume_message_for_inventory_check():
                             session.add(inventory)
                             session.commit()
                             session.refresh(inventory)
+                            inventory_proto = inventory_pb2.Inventory(
+                                product_id = str(inventory.product_id),
+                                stock_level=inventory.stock_level,
+                            )
+                            serialized_inventory = inventory_proto.SerializeToString()
+                            await produce_message(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory)
+
                         else:
                             is_stock_available  = False
                     elif new_msg.option == inventory_pb2.SelectOption.UPDATE:
@@ -303,6 +312,14 @@ async def consume_message_for_inventory_check():
                             inventory.reserved_stock -= new_msg.quantity
                             session.add(inventory)
                             session.commit()
+                            session.refresh(inventory)
+                            inventory_proto = inventory_pb2.Inventory(
+                                product_id = str(inventory.product_id),
+                                stock_level=inventory.stock_level,
+                            )
+                            serialized_inventory = inventory_proto.SerializeToString()
+                            await produce_message(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory)
+
                         elif new_msg.quantity < 0:
                             if (inventory.stock_level -(-new_msg.quantity)) >= 0:
                                 is_stock_available  = True
@@ -310,6 +327,15 @@ async def consume_message_for_inventory_check():
                                 inventory.reserved_stock += (- new_msg.quantity)
                                 session.add(inventory)
                                 session.commit()
+                                session.refresh(inventory)
+                                inventory_proto = inventory_pb2.Inventory(
+                                    product_id = str(inventory.product_id),
+                                    stock_level=inventory.stock_level,
+                                )
+                                serialized_inventory = inventory_proto.SerializeToString()
+                                await produce_message(settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK, serialized_inventory)                                
+
+
                             else:
                                 is_stock_available  = False
                         elif new_msg.quantity == 0:

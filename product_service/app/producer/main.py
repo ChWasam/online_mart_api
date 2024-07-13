@@ -133,15 +133,15 @@ async def lifespan(app: FastAPI):
     db.create_table()
     await create_topic()
     loop = asyncio.get_event_loop()
-    task = loop.create_task(main.consume_message_request())
+    task1 = loop.create_task(main.consume_message_request())
+    task2 = loop.create_task(main.consume_message_for_stock_level_update())
     try:
         yield
     finally:
-        task.cancel()
-        await task
-
-
-
+        for task in [task1,task2]:
+            task.cancel()
+            await task
+            
 # Home Endpoint
 app:FastAPI = FastAPI(lifespan=lifespan )
 @app.get("/")
@@ -183,7 +183,6 @@ async def get_a_product(product_id:UUID, producer:Annotated[AIOKafkaProducer,Dep
     else:
         
         return MessageToDict(product_proto)
-
 
 #  Endpoint to add product to database 
 @app.post("/products", response_model=dict)

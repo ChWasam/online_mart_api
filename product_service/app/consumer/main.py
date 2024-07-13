@@ -210,3 +210,35 @@ async def consume_message_request():
         logger.error(f"Error processing message: {e}")
     finally:
         await consumer.stop()
+
+
+async def consume_message_for_stock_level_update():
+    consumer = AIOKafkaConsumer(
+        settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK,
+        bootstrap_servers=settings.BOOTSTRAP_SERVER,
+        group_id=settings.KAFKA_CONSUMER_GROUP_ID_FOR_STOCK_LEVEL_CHECK,
+        auto_offset_reset='earliest'
+    )
+    await retry_async(consumer.start)
+    try:
+        async for msg in consumer:
+            new_msg = product_pb2.Inventory()
+            new_msg.ParseFromString(msg.value)
+            logger.info(f"Received message: {new_msg}")
+            with Session(db.engine) as session:
+                product = session.exec(select(Product).where(Product.product_id == new_msg.product_id)).first()
+                if new_msg.stock_level <= 0:
+                    product.is_available = False
+                elif new_msg.stock_level > 0 :
+                    product.is_available = True
+                session.add(product)
+                session.commit()
+                
+
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+    finally:
+        await consumer.stop()
+
+
+
