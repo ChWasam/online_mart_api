@@ -146,7 +146,7 @@ app:FastAPI = FastAPI(lifespan=lifespan )
 async def read_root():
     return {"Hello":"Inventory Service"}
 
-# Endpoint to get all the inventorys
+# Endpoint to get all the inventories
 @app.get("/inventory", response_model= list[Inventory])
 async def get_all_inventories(producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
     inventory_proto = inventory_pb2.Inventory(option = inventory_pb2.SelectOption.GET_ALL)
