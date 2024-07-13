@@ -200,8 +200,6 @@ async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotate
         order_proto.quantity = 0
     if order_proto.error_message and order_proto.http_status_code:
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
-    elif order_proto.error_message :
-        return {"Order not created": f"{order_proto.error_message}"}
     else:
         return{"Order Created":{                    
                     "id":order_proto.id,

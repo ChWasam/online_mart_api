@@ -32,7 +32,7 @@ async def retry_async(func, retries=5, delay=2, *args, **kwargs):
                 await asyncio.sleep(delay)
             else:
                 raise
-
+                
 #  Functions to produce message based on topic name and message 
 async def produce_message(topic, message):
     producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)

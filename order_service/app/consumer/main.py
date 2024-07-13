@@ -127,50 +127,60 @@ async def handle_inventory_check(product_id,quantity,option):
 
 #  Function to handle create order request from producer side from where API is called to add product to database 
 async def handle_create_order(new_msg):
-    order = Orders(
-        product_id=uuid.UUID(new_msg.product_id),
-        quantity=new_msg.quantity,
-        shipping_address=new_msg.shipping_address,
-        customer_notes=new_msg.customer_notes
-    )
-    inventory_check = await handle_inventory_check(order.product_id, order.quantity,order_pb2.SelectOption.CREATE)
-    logger.info(f"Inventory check value  :{inventory_check}")
-    if inventory_check.is_product_available:
-        if inventory_check.is_stock_available:
-            with Session(db.engine) as session:
-                session.add(order)
-                session.commit()
-                session.refresh(order)
-                if order:
-                    logger.info(f"Order added to database: {order}")
-                    order_proto = order_pb2.Order(
-                    id=order.id,
-                    order_id = str(order.order_id),
-                    product_id=str(order.product_id),
-                    quantity=order.quantity,
-                    shipping_address=order.shipping_address,
-                    customer_notes=order.customer_notes,
-                    )
-                    serialized_order = order_proto.SerializeToString()
-                    await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
-                    logger.info(f"Order updated in database and sent back: {order_proto}")
-                else:
-                    order_proto = order_pb2.Order(
-                        error_message=f"No order having product_id: {new_msg.product_id} created!",
-                        http_status_code=404
-                    )
-                    serialized_order = order_proto.SerializeToString()
-                    await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+    if new_msg.quantity > 0:
+        order = Orders(
+            product_id=uuid.UUID(new_msg.product_id),
+            quantity=new_msg.quantity,
+            shipping_address=new_msg.shipping_address,
+            customer_notes=new_msg.customer_notes
+        )
+        inventory_check = await handle_inventory_check(order.product_id, order.quantity,order_pb2.SelectOption.CREATE)
+        logger.info(f"Inventory check value  :{inventory_check}")
+        if inventory_check.is_product_available:
+            if inventory_check.is_stock_available:
+                with Session(db.engine) as session:
+                    session.add(order)
+                    session.commit()
+                    session.refresh(order)
+                    if order:
+                        logger.info(f"Order added to database: {order}")
+                        order_proto = order_pb2.Order(
+                        id=order.id,
+                        order_id = str(order.order_id),
+                        product_id=str(order.product_id),
+                        quantity=order.quantity,
+                        shipping_address=order.shipping_address,
+                        customer_notes=order.customer_notes,
+                        )
+                        serialized_order = order_proto.SerializeToString()
+                        await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+                        logger.info(f"Order updated in database and sent back: {order_proto}")
+                    else:
+                        order_proto = order_pb2.Order(
+                            error_message=f"No order having product_id: {new_msg.product_id} created!",
+                            http_status_code=404
+                        )
+                        serialized_order = order_proto.SerializeToString()
+                        await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
+            else:
+                order_proto = order_pb2.Order(
+                    error_message=f"Requested Quantity of product is not available",
+                    http_status_code=404
+                )
+                serialized_order = order_proto.SerializeToString()
+                await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
         else:
             order_proto = order_pb2.Order(
-                error_message=f"Requested Quantity of product is not available",
+                error_message=f"Product with product id : {order.product_id} is not available for sale",
+                http_status_code=404
             )
             serialized_order = order_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
     else:
         order_proto = order_pb2.Order(
-            error_message=f"No Product with product id : {order.product_id} is available for sale",
-        )
+        error_message=f"In order to proceed with order you need to specify the no of items you need to buy",
+        http_status_code=404
+            )
         serialized_order = order_proto.SerializeToString()
         await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
 
