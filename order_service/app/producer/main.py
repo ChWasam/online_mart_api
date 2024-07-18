@@ -111,9 +111,6 @@ class OrdersInputField(SQLModel):
     customer_notes:str = Field(index=True)
 
 
-
-
-
 #  Function to produce message. I will work as a dependency injection for APIs
 async def produce_message():
     producer = AIOKafkaProducer(bootstrap_servers= f"{settings.BOOTSTRAP_SERVER}")

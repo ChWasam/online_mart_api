@@ -45,6 +45,21 @@ services:
     volumes:
       - ./order_service:/code/
 
+  # 04 user service 
+  user:
+    container_name: "user"
+    hostname: "user"
+    build:
+      context: ./user_service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - broker
+      - postgres_db_user
+    ports:
+      - "8003:8003" # Expose container port 8003 to host port 8003
+    volumes:
+      - ./user_service:/code/
+
   broker:
     image: apache/kafka:3.7.0
     hostname: broker
@@ -125,6 +140,21 @@ services:
     volumes:
       - postgres_db_order:/var/lib/postgresql/data
 
+  # 04  postgres_db for user  service 
+
+  postgres_db_user:
+    image: postgres:latest # Use the official PostgreSQL image
+    restart: always
+    container_name: PostgresCont_user
+    environment:
+      - POSTGRES_USER=wasam
+      - POSTGRES_PASSWORD=wasam_password
+      - POSTGRES_DB=wasam_database_user
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_db_user:/var/lib/postgresql/data
+
 volumes:
   # Volume for product
   postgres_db_product:
@@ -134,6 +164,9 @@ volumes:
     driver: local
   #volume for order
   postgres_db_order:
+    driver: local
+  #volume for user
+  postgres_db_user:
     driver: local
 
 networks:

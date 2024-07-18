@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+enum SelectOption {
+    GET = 0;
+    GET_ALL = 1;
+    ADD = 2;
+    REGISTER=3;
+    LOGIN=4;
+    CREATE = 5;
+    UPDATE =6;
+    REDUCE = 7;
+    DELETE = 8;
+}
+
+message User {
+    int32 id =1;
+    string user_id=2;
+    string username =3;
+    string email=4;
+    string password =5;
+    string error_message = 6;
+    SelectOption option =7;
+    int64 http_status_code = 8;
+}
+
+message Inventory {
+    int32 id =1;
+    string product_id=2;
+    string inventory_id =3;
+    int64 stock_level = 4;
+    int64 add_stock_level = 5;
+    int64 reduce_stock_level = 6;
+    int64 reserved_stock = 7;
+    string name = 8;
+    string description =9;
+    float price =10;
+    bool is_available = 11;
+    string error_message = 12;
+    SelectOption option =13;
+    int64 http_status_code = 14;
+}
+
+
+message Product {
+    int32 id =1;
+    string product_id=2;
+    string name = 3;
+    string description =4;
+    float price =5;
+    bool is_available = 6;
+    string message = 7;
+    string error_message = 8;
+    SelectOption option =9;
+    int64 http_status_code = 10;
+}
+
+message UserList {
+    repeated User users = 1;
+}
