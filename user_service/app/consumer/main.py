@@ -146,7 +146,7 @@ async def handle_verify_user(new_msg):
     else:
         user_proto = user_pb2.User(
             username=user.username,
-            option = user_pb2.SelectOption.VERIFY,
+            option = user_pb2.SelectOption.CURRENT_USER,
         )
         serialized_user = user_proto.SerializeToString()
         await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
@@ -198,7 +198,7 @@ async def consume_message_request():
                 await handle_register_user(new_msg)
             elif new_msg.option == user_pb2.SelectOption.LOGIN:
                 await handle_login(new_msg)
-            elif new_msg.option == user_pb2.SelectOption.VERIFY:
+            elif new_msg.option == user_pb2.SelectOption.CURRENT_USER:
                 await handle_verify_user(new_msg)
             # elif new_msg.option == product_pb2.SelectOption.UPDATE:
             #     await handle_update_product(new_msg)

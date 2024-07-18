@@ -6,11 +6,12 @@ enum SelectOption {
     ADD = 2;
     REGISTER=3;
     LOGIN=4;
-    VERIFY=5;
-    CREATE = 6;
-    UPDATE =7;
-    REDUCE = 8;
-    DELETE = 9;
+    CURRENT_USER=5;
+    REFRESH_TOKEN=6;
+    CREATE = 7;
+    UPDATE =8;
+    REDUCE =9;
+    DELETE = 10;
 }
 
 message User {

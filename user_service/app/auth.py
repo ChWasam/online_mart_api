@@ -48,13 +48,12 @@ def generate_token(data: dict, expires_delta: timedelta|None):
 
 # verify token/current_user
 def verify_access_token(token:Annotated[str,Depends(oauth2_scheme)]):
- 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload.get("sub")
-
     except JWTError:
         return None
+
 
     
 
