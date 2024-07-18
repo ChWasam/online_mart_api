@@ -59,7 +59,7 @@ async def handle_get_product(product_id):
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
 
 
-#  Function to handle add product request from producer side from where API is called to add product to database 
+
 async def handle_register_user(new_msg):
     user = auth.check_user_in_db(new_msg.username, new_msg.email)
     if user:
@@ -134,35 +134,25 @@ async def handle_login(new_msg):
 
 
 #  Function to handle update product request from producer side from where API is called to update product to database 
-async def handle_update_product(new_msg):
-    with Session(db.engine) as session:
-        product = session.exec(select(Product).where(Product.product_id == new_msg.product_id)).first()
-        if product:
-            product.name = new_msg.name
-            product.description = new_msg.description
-            product.price = new_msg.price
-            product.is_available = new_msg.is_available
-            session.add(product)
-            session.commit()
-            session.refresh(product)
-            product_proto = product_pb2.Product(
-                id=product.id,
-                product_id=str(product.product_id),
-                name=product.name,
-                description=product.description,
-                price=product.price,
-                is_available=product.is_available,
-            )
-            serialized_product = product_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
-            logger.info(f"Product updated in database and sent back: {product_proto}")
-        else:
-            product_proto = product_pb2.Product(
-                error_message=f"No Product with product_id: {new_msg.product_id} found!",
-                http_status_code=404
-            )
-            serialized_product = product_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+async def handle_verify_user(new_msg):
+    user = auth.check_user_in_db(new_msg.username, new_msg.email)
+    if not user:
+        user_proto = user_pb2.User(
+        error_message=f"User with these credentials do not exists in database",
+        http_status_code=404
+        )
+        serialized_user = user_proto.SerializeToString()
+        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+    else:
+        user_proto = user_pb2.User(
+            username=user.username,
+            option = user_pb2.SelectOption.VERIFY,
+        )
+        serialized_user = user_proto.SerializeToString()
+        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        logger.info(f"User added to database and sent back: {user_proto}")
+
+
 
 
 #  Function to handle delete product request from producer side from where API is called to delete product from database 
@@ -208,8 +198,8 @@ async def consume_message_request():
                 await handle_register_user(new_msg)
             elif new_msg.option == user_pb2.SelectOption.LOGIN:
                 await handle_login(new_msg)
-            # elif new_msg.option == product_pb2.SelectOption.CREATE:
-            #     await handle_create_product(new_msg)
+            elif new_msg.option == user_pb2.SelectOption.VERIFY:
+                await handle_verify_user(new_msg)
             # elif new_msg.option == product_pb2.SelectOption.UPDATE:
             #     await handle_update_product(new_msg)
             # elif new_msg.option == product_pb2.SelectOption.DELETE:

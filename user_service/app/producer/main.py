@@ -78,22 +78,31 @@ async def login_user(login:Annotated[OAuth2PasswordRequestForm,Depends(OAuth2Pas
     user_proto = await kafka.consume_message_response()
     if user_proto.error_message or user_proto.http_status_code :
         raise HTTPException(status_code=user_proto.http_status_code, detail=user_proto.error_message)
-    user_return_from_db = {
-                "id":user_proto.id,
-                "user_id":str(user_proto.user_id),
-                "username":user_proto.username,
-                "email":user_proto.email,
-                "password":user_proto.password,
-    }
 # Here i wish to generate a token and return it to the user
     expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
-    generate_access_token = auth.generate_token(data = {"sub":user_return_from_db["username"]}, expires_delta = expire_time)
+    generate_access_token = auth.generate_token(data = {"sub":user_proto.username}, expires_delta = expire_time)
     return {"access_token":generate_access_token, "token_type":"bearer"}
 
 
 
 #  user/me
+@app.get("/user/me")
+async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access_token)]):
+    credentials_exception = HTTPException(status_code=401, 
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"}   
+        )
+    if not verify_token:
+        raise credentials_exception
+    user_proto = user_pb2.User(username = verify_token, option = user_pb2.SelectOption.VERIFY)
+    serialized_user = user_proto.SerializeToString()
+    await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
 
+    user_proto = await kafka.consume_message_response()
+    if user_proto.error_message or user_proto.http_status_code :
+        raise credentials_exception
+  
+    return user_proto.username
 
 
 
