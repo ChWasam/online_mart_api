@@ -150,7 +150,11 @@ async def handle_verify_user(new_msg):
         await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
     else:
         user_proto = user_pb2.User(
+            id=user.id,
+            user_id=str(user.user_id),
             username=user.username,
+            email=user.email,
+            password= user.password,
             option = user_pb2.SelectOption.CURRENT_USER,
         )
         serialized_user = user_proto.SerializeToString()

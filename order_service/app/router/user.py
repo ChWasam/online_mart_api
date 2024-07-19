@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import Depends,HTTPException
 from typing import Annotated
-from app import order_pb2,kafka,settings, auth
+from app import order_pb2,kafka,settings, auth, model
 import logging
 
 # Set up logging
@@ -38,22 +38,8 @@ async def login_user(login:Annotated[OAuth2PasswordRequestForm,Depends(OAuth2Pas
 # user/me
 
 @user_router.get("/me")
-async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access_token)]):
-    credentials_exception = HTTPException(status_code=401, 
-    detail="Could not validate credentials",
-    headers={"WWW-Authenticate": "Bearer"}   
-    )
-    if not verify_token:
-        raise credentials_exception
-    user_proto = order_pb2.User(username = verify_token, option = order_pb2.SelectOption.CURRENT_USER)
-    serialized_user = user_proto.SerializeToString()
-    await kafka.produce_message(settings.KAFKA_TOPIC_REQUEST_TO_USER, serialized_user)
-
-    user_proto = await kafka.consume_message_from_user_service()
-
-    if user_proto.error_message or user_proto.http_status_code:
-        raise credentials_exception
-    return user_proto.username
+async def get_current_user(verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
+    return verify_token
 
 
 # refresh tokens endpoint

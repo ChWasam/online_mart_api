@@ -49,16 +49,17 @@ message Order {
     int32 id =1;
     string order_id=2;
     string product_id =3;
-    int64 quantity= 4;
-    string shipping_address = 5;
-    string customer_notes = 6;
-    int64 stock_level = 7;
-    bool is_product_available = 8;
-    bool is_stock_available  = 9;
-    string message = 10;
-    string error_message = 11;
-    SelectOption option =12;
-    int64 http_status_code = 13;
+    string user_id = 4;
+    int64 quantity= 5;
+    string shipping_address = 6;
+    string customer_notes = 7;
+    int64 stock_level = 8;
+    bool is_product_available = 9;
+    bool is_stock_available  = 10;
+    string message = 11;
+    string error_message = 12;
+    SelectOption option =13;
+    int64 http_status_code = 14;
 }
 
 message InventoryList {
