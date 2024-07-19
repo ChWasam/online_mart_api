@@ -180,16 +180,19 @@ async def get_all_orders(producer:Annotated[AIOKafkaProducer,Depends(produce_mes
 
 #  Endpoint to get the single order based on endpoint 
 @app.get("/order/{order_id}", response_model=dict)
-async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    order_proto = order_pb2.Order(order_id =str(order_id),  option = order_pb2.SelectOption.GET)
+async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends(produce_message)], verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
+    order_proto = order_pb2.Order(order_id =str(order_id), user_id = str(verify_token.user_id) ,  option = order_pb2.SelectOption.GET)
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+
     order_proto = await consume_message_response_get()
+
     if order_proto.error_message or order_proto.http_status_code :
         raise HTTPException(status_code=order_proto.http_status_code, detail=order_proto.error_message)
     else:
         return {
                 "id":order_proto.id,
+                "user_id": str(order_proto.user_id),
                 "order_id":str(order_proto.order_id) ,
                 "product_id":str(order_proto.product_id),
                 "quantity":order_proto.quantity,

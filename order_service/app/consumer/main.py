@@ -66,12 +66,14 @@ async def handle_get_all_orders(user_id):
 
 
 #  Function to handle get order request from producer side from where API is called to get an order 
-async def handle_get_order(order_id):
+async def handle_get_order(new_msg):
     with Session(db.engine) as session:
-        order = session.exec(select(Orders).where(Orders.order_id == order_id)).first()
+        user_orders = session.exec(select(Orders).where(Orders.user_id == uuid.UUID(new_msg.user_id))).all()
+        order = next( (order for order in user_orders if order.order_id == uuid.UUID(new_msg.order_id)),None)
         if order:
             order_proto = order_pb2.Order(
                 id=order.id,
+                user_id = str(order.user_id),
                 order_id=str(order.order_id) ,
                 product_id=str(order.product_id),
                 quantity=order.quantity,
@@ -83,7 +85,7 @@ async def handle_get_order(order_id):
             logger.info(f"Order sent back from database: {order_proto}")
         else:
             order_proto = order_pb2.Order(
-                error_message=f"No Order with order_id: {order_id} found!",
+                error_message=f"No Order with order_id: {new_msg.order_id} found!",
                 http_status_code=400
             )
             serialized_order = order_proto.SerializeToString()
@@ -303,7 +305,7 @@ async def consume_message_request():
             if new_msg.option == order_pb2.SelectOption.GET_ALL:
                 await handle_get_all_orders(new_msg.user_id)
             elif new_msg.option == order_pb2.SelectOption.GET:
-                await handle_get_order(new_msg.order_id)
+                await handle_get_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.CREATE:
                 await handle_create_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.UPDATE:
