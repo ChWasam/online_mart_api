@@ -93,7 +93,7 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
         )
     if not verify_token:
         raise credentials_exception
-    user_proto = user_pb2.User(username = verify_token, option = user_pb2.SelectOption.VERIFY)
+    user_proto = user_pb2.User(username = verify_token, option = user_pb2.SelectOption.CURRENT_USER)
     serialized_user = user_proto.SerializeToString()
     await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
 
