@@ -75,17 +75,12 @@ async def login_user(login:Annotated[OAuth2PasswordRequestForm,Depends(OAuth2Pas
     user_proto = user_pb2.User(username = login.username, password = login.password, option = user_pb2.SelectOption.LOGIN)
     serialized_user = user_proto.SerializeToString()
     await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
+
     user_proto = await kafka.consume_message_response()
+
     if user_proto.error_message or user_proto.http_status_code :
         raise HTTPException(status_code=user_proto.http_status_code, detail=user_proto.error_message)
-# Here i wish to generate a token and return it to the user
-    expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
-    access_token = auth.generate_token(data = {"sub":user_proto.username}, expires_delta = expire_time)
-# Refresh token
-    expire_time_for_refresh_token = timedelta(days = 15)
-    refresh_token = auth.generate_token(data = {"sub":user_proto.email}, expires_delta = expire_time_for_refresh_token)
-
-    return {"access_token":access_token, "token_type":"bearer", "refresh_token":refresh_token}
+    return {"access_token":user_proto.access_token, "token_type":"bearer", "refresh_token":user_proto.refresh_token}
 
 
 
@@ -98,7 +93,7 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
         )
     if not verify_token:
         raise credentials_exception
-    user_proto = user_pb2.User(username = verify_token, option = user_pb2.SelectOption.CURRENT_USER)
+    user_proto = user_pb2.User(username = verify_token, option = user_pb2.SelectOption.VERIFY)
     serialized_user = user_proto.SerializeToString()
     await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
 
@@ -108,6 +103,32 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
   
     return user_proto.username
 
+
+@app.post("/user/refresh_token")
+async def refresh_token(old_refresh_token:str):
+    credentials_exception = HTTPException(status_code=401, 
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"}   
+    )
+
+    email = auth.verify_refresh_token(old_refresh_token)
+    if not email:
+        raise credentials_exception
+    user_proto = user_pb2.User(email = email, option = user_pb2.SelectOption.REFRESH_TOKEN)
+    serialized_user = user_proto.SerializeToString()
+    await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
+    user_proto = await kafka.consume_message_response()
+    if user_proto.error_message or user_proto.http_status_code :
+        raise credentials_exception
+    
+# Here i wish to generate a token and return it to the user
+    expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
+    access_token = auth.generate_token(data = {"sub":user_proto.username}, expires_delta = expire_time)
+# Refresh token
+    expire_time_for_refresh_token = timedelta(days = 15)
+    refresh_token = auth.generate_token(data = {"sub":user_proto.email}, expires_delta = expire_time_for_refresh_token)
+
+    return {"access_token":access_token, "token_type":"bearer", "refresh_token":refresh_token}
 
 
 

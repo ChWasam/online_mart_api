@@ -10,8 +10,8 @@ enum SelectOption {
     REFRESH_TOKEN=6;
     CREATE = 7;
     UPDATE =8;
-    REDUCE =9;
-    DELETE = 10;
+    REDUCE = 9;
+    DELETE =10;
 }
 
 message User {
@@ -20,9 +20,11 @@ message User {
     string username =3;
     string email=4;
     string password =5;
-    string error_message = 6;
-    SelectOption option =7;
-    int64 http_status_code = 8;
+    string access_token = 6;
+    string refresh_token = 7;
+    string error_message = 8;
+    SelectOption option =9;
+    int64 http_status_code = 10;
 }
 
 message Inventory {

@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, create_engine, select, Session
-from app import settings, user_pb2,db, kafka
+from app import settings, user_pb2,db, kafka,auth
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from datetime import datetime, timezone, timedelta
 import asyncio
 import logging
 import uuid
@@ -105,12 +106,16 @@ async def handle_login(new_msg):
     user = auth.check_user_in_db(new_msg.username, new_msg.password)
     if user:
         if auth.verify_password(new_msg.password, user.password):
+        # Here i wish to generate a token and return it to the user
+            expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
+            access_token = auth.generate_token(data = {"sub":user.username}, expires_delta = expire_time)
+        # Refresh token
+            expire_time_for_refresh_token = timedelta(days = 15)
+            refresh_token = auth.generate_token(data = {"sub":user.email}, expires_delta = expire_time_for_refresh_token)
+
             user_proto = user_pb2.User(
-                id=user.id,
-                user_id=str(user.user_id),
-                username=user.username,
-                email=user.email,
-                password=user.password,
+                access_token = access_token,
+                refresh_token = refresh_token,
                 option = user_pb2.SelectOption.LOGIN
             )
             serialized_user = user_proto.SerializeToString()
@@ -150,9 +155,26 @@ async def handle_verify_user(new_msg):
         )
         serialized_user = user_proto.SerializeToString()
         await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
-        logger.info(f"User added to database and sent back: {user_proto}")
+        logger.info(f"User verified and username sent back: {user_proto}")
 
-
+async def handle_refresh_token(new_msg):
+    user = auth.check_user_in_db(new_msg.username, new_msg.email)
+    if not user:
+        user_proto = user_pb2.User(
+        error_message=f"User with these credentials do not exists in database",
+        http_status_code=404
+        )
+        serialized_user = user_proto.SerializeToString()
+        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+    else:
+        user_proto = user_pb2.User(
+            username=user.username,
+            email=user.email,
+            option = user_pb2.SelectOption.REFRESH_TOKEN,
+        )
+        serialized_user = user_proto.SerializeToString()
+        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        logger.info(f"User verified and email sent back: {user_proto}")
 
 
 #  Function to handle delete product request from producer side from where API is called to delete product from database 
@@ -200,9 +222,9 @@ async def consume_message_request():
                 await handle_login(new_msg)
             elif new_msg.option == user_pb2.SelectOption.CURRENT_USER:
                 await handle_verify_user(new_msg)
-            # elif new_msg.option == product_pb2.SelectOption.UPDATE:
-            #     await handle_update_product(new_msg)
-            # elif new_msg.option == product_pb2.SelectOption.DELETE:
+            elif new_msg.option == user_pb2.SelectOption.REFRESH_TOKEN:
+                await handle_refresh_token(new_msg)
+            # elif new_msg.option == user_pb2.SelectOption.DELETE:
             #     await handle_delete_product(new_msg.product_id)
             else:
                 logger.warning(f"Unknown option received: {new_msg.option}")

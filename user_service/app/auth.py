@@ -46,8 +46,16 @@ def generate_token(data: dict, expires_delta: timedelta|None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-# verify token/current_user
+# verify access token/current_user
 def verify_access_token(token:Annotated[str,Depends(oauth2_scheme)]):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+# verify refresh token
+def verify_refresh_token(token:str):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload.get("sub")
