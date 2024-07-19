@@ -167,11 +167,18 @@ async def handle_refresh_token(new_msg):
         serialized_user = user_proto.SerializeToString()
         await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
     else:
+    # Here i wish to generate a token and return it to the user
+        expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
+        access_token = auth.generate_token(data = {"sub":user.username}, expires_delta = expire_time)
+    # Refresh token
+        expire_time_for_refresh_token = timedelta(days = 15)
+        refresh_token = auth.generate_token(data = {"sub":user.email}, expires_delta = expire_time_for_refresh_token)
+
         user_proto = user_pb2.User(
-            username=user.username,
-            email=user.email,
-            option = user_pb2.SelectOption.REFRESH_TOKEN,
-        )
+            access_token = access_token,
+            refresh_token = refresh_token,
+            option = user_pb2.SelectOption.REFRESH_TOKEN
+            )
         serialized_user = user_proto.SerializeToString()
         await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
         logger.info(f"User verified and email sent back: {user_proto}")

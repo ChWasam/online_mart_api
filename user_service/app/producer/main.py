@@ -90,7 +90,7 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
     credentials_exception = HTTPException(status_code=401, 
     detail="Could not validate credentials",
     headers={"WWW-Authenticate": "Bearer"}   
-        )
+    )
     if not verify_token:
         raise credentials_exception
     user_proto = user_pb2.User(username = verify_token, option = user_pb2.SelectOption.CURRENT_USER)
@@ -98,9 +98,9 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
     await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
 
     user_proto = await kafka.consume_message_response()
-    if user_proto.error_message or user_proto.http_status_code :
+    
+    if user_proto.error_message or user_proto.http_status_code:
         raise credentials_exception
-  
     return user_proto.username
 
 
@@ -108,9 +108,8 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
 async def refresh_token(old_refresh_token:str):
     credentials_exception = HTTPException(status_code=401, 
     detail="Could not validate credentials",
-    headers={"WWW-Authenticate": "Bearer"}   
+    headers={"WWW-Authenticate": "Bearer"} 
     )
-
     email = auth.verify_refresh_token(old_refresh_token)
     if not email:
         raise credentials_exception
@@ -120,15 +119,7 @@ async def refresh_token(old_refresh_token:str):
     user_proto = await kafka.consume_message_response()
     if user_proto.error_message or user_proto.http_status_code :
         raise credentials_exception
-    
-# Here i wish to generate a token and return it to the user
-    expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
-    access_token = auth.generate_token(data = {"sub":user_proto.username}, expires_delta = expire_time)
-# Refresh token
-    expire_time_for_refresh_token = timedelta(days = 15)
-    refresh_token = auth.generate_token(data = {"sub":user_proto.email}, expires_delta = expire_time_for_refresh_token)
-
-    return {"access_token":access_token, "token_type":"bearer", "refresh_token":refresh_token}
+    return {"access_token":user_proto.access_token, "token_type":"bearer", "refresh_token":user_proto.refresh_token}
 
 
 
