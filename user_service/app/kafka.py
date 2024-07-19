@@ -88,7 +88,7 @@ async def consume_message_response():
 
 
 
-#  Function to produce message. I will work as a dependency injection for APIs
+#  Function to produce message. It will work as a dependency injection for APIs
 async def produce_message():
     producer = AIOKafkaProducer(bootstrap_servers= f"{settings.BOOTSTRAP_SERVER}")
     await retry_async(producer.start)
@@ -98,7 +98,7 @@ async def produce_message():
         await producer.stop()
 
 
-#  Function to produce message. I will work as a dependency injection for APIs
+#  Function to produce message. 
 async def produce_message(topic, message):
     producer = AIOKafkaProducer(bootstrap_servers=settings.BOOTSTRAP_SERVER)
     await retry_async(producer.start)

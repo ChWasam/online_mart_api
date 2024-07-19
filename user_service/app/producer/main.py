@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     await kafka.create_topic()
     loop = asyncio.get_event_loop()
     task = loop.create_task(main.consume_message_request())
-    # task2 = loop.create_task(main.consume_message_for_stock_level_update())
+    # task2 = loop.create_task(main.consume_message_request_from_order_service())
     try:
         yield
     finally:
@@ -98,7 +98,7 @@ async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access
     await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
 
     user_proto = await kafka.consume_message_response()
-    
+
     if user_proto.error_message or user_proto.http_status_code:
         raise credentials_exception
     return user_proto.username

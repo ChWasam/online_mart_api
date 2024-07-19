@@ -119,7 +119,7 @@ async def handle_login(new_msg):
                 option = user_pb2.SelectOption.LOGIN
             )
             serialized_user = user_proto.SerializeToString()
-            await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
             logger.info(f"User logged in and sent back: {user_proto}")
         else:
             user_proto = user_pb2.User(
@@ -127,14 +127,14 @@ async def handle_login(new_msg):
                 http_status_code=401
             )
             serialized_user = user_proto.SerializeToString()
-            await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
     else:
         user_proto = user_pb2.User(
         error_message=f"{new_msg.username} is not registered in not registered in database",
         http_status_code=404
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
             
 
 
@@ -147,14 +147,14 @@ async def handle_verify_user(new_msg):
         http_status_code=404
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
     else:
         user_proto = user_pb2.User(
             username=user.username,
             option = user_pb2.SelectOption.CURRENT_USER,
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
         logger.info(f"User verified and username sent back: {user_proto}")
 
 async def handle_refresh_token(new_msg):
@@ -165,7 +165,7 @@ async def handle_refresh_token(new_msg):
         http_status_code=404
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
     else:
     # Here i wish to generate a token and return it to the user
         expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
@@ -180,7 +180,7 @@ async def handle_refresh_token(new_msg):
             option = user_pb2.SelectOption.REFRESH_TOKEN
             )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_GET, serialized_user)
+        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
         logger.info(f"User verified and email sent back: {user_proto}")
 
 
@@ -241,33 +241,7 @@ async def consume_message_request():
         await consumer.stop()
 
 
-# async def consume_message_for_stock_level_update():
-#     consumer = AIOKafkaConsumer(
-#         settings.KAFKA_TOPIC_STOCK_LEVEL_CHECK,
-#         bootstrap_servers=settings.BOOTSTRAP_SERVER,
-#         group_id=settings.KAFKA_CONSUMER_GROUP_ID_FOR_STOCK_LEVEL_CHECK,
-#         auto_offset_reset='earliest'
-#     )
-#     await retry_async(consumer.start)
-#     try:
-#         async for msg in consumer:
-#             new_msg = product_pb2.Inventory()
-#             new_msg.ParseFromString(msg.value)
-#             logger.info(f"Received message: {new_msg}")
-#             with Session(db.engine) as session:
-#                 product = session.exec(select(Product).where(Product.product_id == new_msg.product_id)).first()
-#                 if new_msg.stock_level <= 0:
-#                     product.is_available = False
-#                 elif new_msg.stock_level > 0 :
-#                     product.is_available = True
-#                 session.add(product)
-#                 session.commit()
-                
 
-#     except Exception as e:
-#         logger.error(f"Error processing message: {e}")
-#     finally:
-#         await consumer.stop()
 
 
 

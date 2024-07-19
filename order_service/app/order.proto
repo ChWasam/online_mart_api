@@ -4,10 +4,28 @@ enum SelectOption {
     GET = 0;
     GET_ALL = 1;
     ADD = 2;
-    CREATE = 3;
-    UPDATE = 4;
-    REDUCE = 5;
-    DELETE = 6;
+    REGISTER=3;
+    LOGIN=4;
+    CURRENT_USER=5;
+    REFRESH_TOKEN=6;
+    CREATE = 7;
+    UPDATE =8;
+    REDUCE = 9;
+    DELETE =10;
+}
+
+
+message User {
+    int32 id =1;
+    string user_id=2;
+    string username =3;
+    string email=4;
+    string password =5;
+    string access_token = 6;
+    string refresh_token = 7;
+    string error_message = 8;
+    SelectOption option =9;
+    int64 http_status_code = 10;
 }
 
 

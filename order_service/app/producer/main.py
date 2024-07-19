@@ -5,9 +5,10 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from aiokafka import AIOKafkaProducer , AIOKafkaConsumer
 from aiokafka.admin import AIOKafkaAdminClient,NewTopic
+from app.router import user
 from app import order_pb2
 from app import settings
-from app import db 
+from app import db ,kafka
 from app.consumer import main
 import uuid 
 from uuid import UUID 
@@ -19,7 +20,6 @@ import logging
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 # Retry utility
 async def retry_async(func, retries=5, delay=2, *args, **kwargs):
@@ -42,7 +42,8 @@ async def create_topic ():
     await retry_async(admin_client.start)
     topic_list = [
         NewTopic(name=f"{settings.KAFKA_TOPIC}", num_partitions=2, replication_factor=1),
-        NewTopic(name=f"{settings.KAFKA_TOPIC_GET}", num_partitions=2, replication_factor=1)
+        NewTopic(name=f"{settings.KAFKA_TOPIC_GET}", num_partitions=2, replication_factor=1),
+        NewTopic(name=f"{settings.KAFKA_TOPIC_RESPONSE_FROM_USER}", num_partitions=2, replication_factor=1)
     ]
     try:
         await admin_client.create_topics(new_topics=topic_list, validate_only= False)
@@ -96,6 +97,8 @@ async def consume_message_response_get():
         await consumer.stop()
 
 
+
+
 # Pydantic dataValidation 
 class Orders(SQLModel):
     id : int|None = Field(default = None , primary_key= True)
@@ -128,16 +131,21 @@ async def lifespan(app: FastAPI):
     await create_topic()
     loop = asyncio.get_event_loop()
     task = loop.create_task(main.consume_message_request())
+    # task2 = loop.create_task(kafka.consume_message_from_user_service())
     try:
         yield
     finally:
-        task.cancel()
-        await task
+        # for task in [task1,task2]:
+            task.cancel()
+            await task
 
 
 
 
 app:FastAPI = FastAPI(lifespan=lifespan )
+
+app.include_router(router=user.user_router)
+
 
 # Home Endpoint
 @app.get("/")
