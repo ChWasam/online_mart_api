@@ -156,15 +156,17 @@ async def read_root():
 
 # Endpoint to get all the orders
 @app.get("/orders", response_model= list[Orders])
-async def get_all_orders(producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    order_proto = order_pb2.Order(option = order_pb2.SelectOption.GET_ALL)
+async def get_all_orders(producer:Annotated[AIOKafkaProducer,Depends(produce_message)], verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
+    order_proto = order_pb2.Order(user_id = str(verify_token.user_id), option = order_pb2.SelectOption.GET_ALL)
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+    
     order_list_proto = await consume_message_response_get_all()
 
     order_list = [
         {
                 "id":order.id,
+                "user_id": str(order.user_id),
                 "order_id":str(order.order_id) ,
                 "product_id":str(order.product_id),
                 "quantity":order.quantity,

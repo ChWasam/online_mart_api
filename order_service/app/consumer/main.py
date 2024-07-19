@@ -45,13 +45,14 @@ async def produce_message(topic, message):
         await producer.stop()
 
 #  Function to handle get all orders request from producer side from where API is called to get all orders 
-async def handle_get_all_orders():
+async def handle_get_all_orders(user_id):
     with Session(db.engine) as session:
-        orders_list = session.exec(select(Orders)).all()
+        orders_list = session.exec(select(Orders).where(Orders.user_id == user_id)).all()
         orders_list_proto = order_pb2.OrderList()
         for order in orders_list:
             order_proto = order_pb2.Order(
                 id=order.id,
+                user_id = str(order.user_id),
                 order_id=str(order.order_id) ,
                 product_id=str(order.product_id),
                 quantity=order.quantity,
@@ -300,7 +301,7 @@ async def consume_message_request():
             logger.info(f"new_msg.quantity: {new_msg.quantity}")
             
             if new_msg.option == order_pb2.SelectOption.GET_ALL:
-                await handle_get_all_orders()
+                await handle_get_all_orders(new_msg.user_id)
             elif new_msg.option == order_pb2.SelectOption.GET:
                 await handle_get_order(new_msg.order_id)
             elif new_msg.option == order_pb2.SelectOption.CREATE:
