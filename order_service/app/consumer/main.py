@@ -14,10 +14,11 @@ logger = logging.getLogger(__name__)
 
 #  Used for data validation and table fields 
 class Orders(SQLModel, table=True):
-    __tablename__ = "order_table"
+    __tablename__ = "orders_table"
     id : int|None = Field(default = None , primary_key= True)
     order_id:UUID = Field(default_factory=uuid.uuid4, index=True)
     product_id:UUID = Field(index=True)
+    user_id:UUID = Field(index=True)
     quantity:int = Field(index=True)
     shipping_address:str = Field(index=True)
     customer_notes:str = Field(index=True)
@@ -130,6 +131,7 @@ async def handle_create_order(new_msg):
     if new_msg.quantity > 0:
         order = Orders(
             product_id=uuid.UUID(new_msg.product_id),
+            user_id=uuid.UUID(new_msg.user_id),
             quantity=new_msg.quantity,
             shipping_address=new_msg.shipping_address,
             customer_notes=new_msg.customer_notes
@@ -148,6 +150,7 @@ async def handle_create_order(new_msg):
                         id=order.id,
                         order_id = str(order.order_id),
                         product_id=str(order.product_id),
+                        user_id=str(order.user_id),
                         quantity=order.quantity,
                         shipping_address=order.shipping_address,
                         customer_notes=order.customer_notes,

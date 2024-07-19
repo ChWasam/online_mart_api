@@ -8,7 +8,7 @@ from aiokafka.admin import AIOKafkaAdminClient,NewTopic
 from app.router import user
 from app import order_pb2
 from app import settings
-from app import db ,kafka
+from app import db ,kafka, model, auth
 from app.consumer import main
 import uuid 
 from uuid import UUID 
@@ -104,6 +104,7 @@ class Orders(SQLModel):
     id : int|None = Field(default = None , primary_key= True)
     order_id:UUID = Field(default_factory=uuid.uuid4, index=True)
     product_id:UUID = Field(index=True)
+    user_id:UUID = Field(index=True)
     quantity:int = Field(index=True)
     shipping_address:str = Field(index=True)
     customer_notes:str = Field(index=True)
@@ -112,6 +113,7 @@ class OrdersInputField(SQLModel):
     quantity:int = Field(index=True)
     shipping_address:str = Field(index=True)
     customer_notes:str = Field(index=True)
+
 
 
 #  Function to produce message. I will work as a dependency injection for APIs
@@ -140,7 +142,7 @@ async def lifespan(app: FastAPI):
             await task
 
 
-
+# verify_token:Annotated[model.User,Depends(auth.verify_access_token)]
 
 app:FastAPI = FastAPI(lifespan=lifespan )
 
@@ -196,11 +198,13 @@ async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends
 
 #  Endpoint to add order to database 
 @app.post("/order/{product_id}", response_model=dict)
-async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
-    order_proto = order_pb2.Order(product_id = str(product_id), quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes ,option = order_pb2.SelectOption.CREATE)
+async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)], verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
+    order_proto = order_pb2.Order(product_id = str(product_id), user_id = str(verify_token.user_id), quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes ,option = order_pb2.SelectOption.CREATE)
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
+
     order_proto = await consume_message_response_get()
+
     if order_proto.quantity is None:
         order_proto.quantity = 0
     if order_proto.error_message and order_proto.http_status_code:
@@ -208,6 +212,7 @@ async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotate
     else:
         return{"Order Created":{                    
                     "id":order_proto.id,
+                    "user_id": str(order_proto.user_id),
                     "order_id" : str(order_proto.order_id),
                     "product_id":str(order_proto.product_id),
                     "quantity":order_proto.quantity,
