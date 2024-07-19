@@ -199,7 +199,8 @@ async def handle_create_order(new_msg):
 #  Function to handle update order request from producer side from where API is called to update order to database 
 async def handle_update_order(new_msg):
     with Session(db.engine) as session:
-        order = session.exec(select(Orders).where(Orders.order_id == new_msg.order_id)).first()
+        user_orders = session.exec(select(Orders).where(Orders.user_id == uuid.UUID(new_msg.user_id))).all()
+        order = next( (order for order in user_orders if order.order_id == uuid.UUID(new_msg.order_id)),None)
         logger.info(f"order: {order}")
         if order:
             new_quantity =order.quantity - new_msg.quantity
@@ -226,6 +227,7 @@ async def handle_update_order(new_msg):
                     logger.info(f"Order added to database: {order}")
                     order_proto = order_pb2.Order(
                     id=order.id,
+                    user_id = str(order.user_id),
                     order_id = str(order.order_id),
                     product_id=str(order.product_id),
                     quantity=order.quantity,
@@ -260,22 +262,23 @@ async def handle_update_order(new_msg):
 
 
 #  Function to handle delete product request from producer side from where API is called to delete product from database 
-async def handle_delete_order(order_id):
+async def handle_delete_order(new_msg):
     with Session(db.engine) as session:
-        order = session.exec(select(Orders).where(Orders.order_id == order_id)).first()
+        user_orders = session.exec(select(Orders).where(Orders.user_id == uuid.UUID(new_msg.user_id))).all()
+        order = next( (order for order in user_orders if order.order_id == uuid.UUID(new_msg.order_id)),None)
         if order:
-            inventory_check = await handle_inventory_check(order.product_id, order.quantity, order_pb2.SelectOption.DELETE)
+            await handle_inventory_check(order.product_id, order.quantity, order_pb2.SelectOption.DELETE)
             session.delete(order)
             session.commit()
             order_proto = order_pb2.Order(
-                message=f"Order with order_id: {order_id} deleted!",
+                message=f"Order with order_id: {new_msg.order_id} deleted!",
             )
             serialized_product = order_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
             logger.info(f"Order deleted and confirmation sent back: {order_proto}")
         else:
             order_proto = order_pb2.Order(
-                error_message=f"No Order with order_id: {order_id} found!",
+                error_message=f"No Order with order_id: {new_msg.order_id} found!",
                 http_status_code=404
             )
             serialized_product = order_proto.SerializeToString()
@@ -311,7 +314,7 @@ async def consume_message_request():
             elif new_msg.option == order_pb2.SelectOption.UPDATE:
                 await handle_update_order(new_msg)
             elif new_msg.option == order_pb2.SelectOption.DELETE:
-                await handle_delete_order(new_msg.order_id)
+                await handle_delete_order(new_msg)
             else:
                 logger.warning(f"Unknown option received: {new_msg.option}")
     except Exception as e:
