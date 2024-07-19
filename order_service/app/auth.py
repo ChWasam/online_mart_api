@@ -32,13 +32,7 @@ async def verify_access_token(token:Annotated[str,Depends(oauth2_scheme)]):
     if user_proto.error_message or user_proto.http_status_code:
         raise credentials_exception
     
-    return {
-            "id" : user_proto.id,
-            "user_id" : str(user_proto.user_id),
-            "username" : user_proto.username,
-            "email" : user_proto.email,
-            "password" : user_proto.password,
-    }
+    return user_proto
 
 
 

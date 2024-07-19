@@ -39,7 +39,13 @@ async def login_user(login:Annotated[OAuth2PasswordRequestForm,Depends(OAuth2Pas
 
 @user_router.get("/me")
 async def get_current_user(verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
-    return verify_token
+    return {
+            "id" : verify_token.id,
+            "user_id" : str(verify_token.user_id),
+            "username" : verify_token.username,
+            "email" : verify_token.email,
+            "password" : verify_token.password,
+    }
 
 
 # refresh tokens endpoint
