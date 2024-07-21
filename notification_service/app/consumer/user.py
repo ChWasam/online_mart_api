@@ -4,9 +4,6 @@ from app import notification_pb2, kafka, handle_email
 import logging
 
 
-
-
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,8 +25,9 @@ async def consume_message_from_user_registration():
                 new_msg.ParseFromString(msg.value)
                 logger.info(f"new_msg on producer side:{new_msg}")
                 if new_msg.option == notification_pb2.SelectOption.REGISTER:
-                    body = f"""Hi {new_msg.username}
-                            welcome to the online Mart. You have been successfully registered"""
+                    body = f"""Hi {new_msg.username},
+welcome to the online Mart. You have been successfully registered.
+Now you can buy products from online mart"""
                     subject = f"""New User Registration """
                     await handle_email.send_email(body = body , subject = subject, user_email = new_msg.email)
                     # await handle_register_user(new_msg)
