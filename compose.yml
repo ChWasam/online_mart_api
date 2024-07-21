@@ -60,6 +60,20 @@ services:
     volumes:
       - ./user_service:/code/
 
+  # 04 notification service 
+  notification:
+    container_name: "notification"
+    hostname: "notification"
+    build:
+      context: ./notification_service
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - broker
+    ports:
+      - "8004:8004" # Expose container port 8004 to host port 8004
+    volumes:
+      - ./notification_service:/code/
+
   broker:
     image: apache/kafka:3.7.0
     hostname: broker

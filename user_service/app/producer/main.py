@@ -55,6 +55,7 @@ async def register_user(register:Annotated[model.RegisterUser,Depends(model.Regi
     await kafka.produce_message(settings.KAFKA_TOPIC, serialized_user)
     
     user_proto = await kafka.consume_message_response()
+    
     if user_proto.error_message or user_proto.http_status_code :
         raise HTTPException(status_code=user_proto.http_status_code, detail=user_proto.error_message)
     else:
