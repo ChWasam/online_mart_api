@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import Depends,HTTPException
 from typing import Annotated
-from app import order_pb2,kafka,settings, auth, model
+from app import payment_pb2,kafka,settings, auth, model
 import logging
 
 # Set up logging

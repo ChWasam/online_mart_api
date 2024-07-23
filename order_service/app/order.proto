@@ -14,7 +14,6 @@ enum SelectOption {
     DELETE =10;
 }
 
-
 message User {
     int32 id =1;
     string user_id=2;
@@ -28,6 +27,16 @@ message User {
     int64 http_status_code = 10;
 }
 
+enum OrderStatus {
+  IN_PROGRESS = 0;
+  COMPLETED = 1;
+}
+
+enum PaymentStatus {
+    PENDING = 0;
+    PAID = 1;
+    FAILED = 2;
+}
 
 message Order {
     int32 id =1;
@@ -42,8 +51,10 @@ message Order {
     bool is_stock_available  = 10;
     string message = 11;
     string error_message = 12;
-    SelectOption option =13;
-    int64 http_status_code = 14;
+    OrderStatus order_status = 13;
+    PaymentStatus payment_status = 14;
+    SelectOption option =15;
+    int64 http_status_code = 16;
 }
 
 message OrderList {

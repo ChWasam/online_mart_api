@@ -22,6 +22,8 @@ class Orders(SQLModel, table=True):
     quantity:int = Field(index=True)
     shipping_address:str = Field(index=True)
     customer_notes:str = Field(index=True)
+    order_status:str = Field(default="In_progress", index=True)
+    payment_status:str = Field(default="Pending", index=True)
 
 # Retry utility
 async def retry_async(func, retries=5, delay=2, *args, **kwargs):
@@ -157,6 +159,7 @@ async def handle_create_order(new_msg):
                         quantity=order.quantity,
                         shipping_address=order.shipping_address,
                         customer_notes=order.customer_notes,
+                        option = order_pb2.SelectOption.CREATE
                         )
                         serialized_order = order_proto.SerializeToString()
                         await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
