@@ -12,6 +12,24 @@ enum SelectOption {
     UPDATE =8;
     REDUCE = 9;
     DELETE =10;
+    PAYMENT_DONE = 11;
+}
+
+message Payment {
+    int32 id =1;
+    string payment_id=2;
+    string order_id =3;
+    string user_id=4;
+    float amount = 5;
+    int64 card_number = 6;
+    int32 exp_month = 7;
+    int32 exp_year = 8;
+    int32 cvc = 9;
+    PaymentStatus payment_status = 10;
+    SelectOption option =11;
+    int64 http_status_code = 12;
+    string error_message = 13;
+
 }
 
 message User {

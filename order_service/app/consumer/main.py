@@ -261,7 +261,7 @@ async def handle_update_order(new_msg):
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_order)
 
                 
-##################################### Update ORDER ################################
+##################################### Delete ORDER ################################
 
 
 #  Function to handle delete product request from producer side from where API is called to delete product from database 
@@ -270,15 +270,23 @@ async def handle_delete_order(new_msg):
         user_orders = session.exec(select(Orders).where(Orders.user_id == uuid.UUID(new_msg.user_id))).all()
         order = next( (order for order in user_orders if order.order_id == uuid.UUID(new_msg.order_id)),None)
         if order:
-            await handle_inventory_check(order.product_id, order.quantity, order_pb2.SelectOption.DELETE)
-            session.delete(order)
-            session.commit()
-            order_proto = order_pb2.Order(
-                message=f"Order with order_id: {new_msg.order_id} deleted!",
-            )
-            serialized_product = order_proto.SerializeToString()
-            await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
-            logger.info(f"Order deleted and confirmation sent back: {order_proto}")
+            if order.payment_status == "Payment Done":
+                order_proto = order_pb2.Order(
+                message=f"Order with order_id: {new_msg.order_id} can not be deleted! as payment is done and it has been dispatched from the warehouse",
+                )
+                serialized_product = order_proto.SerializeToString()
+                await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+
+            else:
+                await handle_inventory_check(order.product_id, order.quantity, order_pb2.SelectOption.DELETE)
+                session.delete(order)
+                session.commit()
+                order_proto = order_pb2.Order(
+                    message=f"Order with order_id: {new_msg.order_id} deleted!",
+                )
+                serialized_product = order_proto.SerializeToString()
+                await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
+                logger.info(f"Order deleted and confirmation sent back: {order_proto}")
         else:
             order_proto = order_pb2.Order(
                 error_message=f"No Order with order_id: {new_msg.order_id} found!",
@@ -320,6 +328,40 @@ async def consume_message_request():
                 await handle_delete_order(new_msg)
             else:
                 logger.warning(f"Unknown option received: {new_msg.option}")
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+    finally:
+        await consumer.stop()
+
+
+
+
+
+#  Function to consume message from the APIs on the producer side and perform functionalities according to the request made by APIs 
+async def consume_message_from_payment_service():
+    consumer = AIOKafkaConsumer(
+        settings.KAFKA_TOPIC_PAYMENT_DONE_FROM_PAYMENT,
+        bootstrap_servers=settings.BOOTSTRAP_SERVER,
+        group_id=settings.KAFKA_CONSUMER_GROUP_ID_FOR_RESPONSE_FROM_PAYMENT,
+        auto_offset_reset='earliest'
+    )
+    await retry_async(consumer.start)
+    try:
+        async for msg in consumer:
+            new_msg = order_pb2.Payment()
+            new_msg.ParseFromString(msg.value)
+            logger.info(f"Received message at order service from payment: {new_msg}")
+            if new_msg.payment_status == order_pb2.PaymentStatus.PAID:
+                with Session(db.engine) as session:
+                    user_orders = session.exec(select(Orders).where(Orders.user_id == uuid.UUID(new_msg.user_id))).all()
+                    order = next( (order for order in user_orders if order.order_id == uuid.UUID(new_msg.order_id)),None)
+                    logger.info(f"order: {order}")
+                    if order:
+                        await handle_inventory_check(order.product_id, order.quantity, order_pb2.SelectOption.PAYMENT_DONE)
+                        order.order_status = "Completed"
+                        order.payment_status = "Payment Done"
+                        session.add(order)
+                        session.commit()
     except Exception as e:
         logger.error(f"Error processing message: {e}")
     finally:

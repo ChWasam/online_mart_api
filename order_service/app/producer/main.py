@@ -132,14 +132,45 @@ async def lifespan(app: FastAPI):
     db.create_table()
     await create_topic()
     loop = asyncio.get_event_loop()
-    task = loop.create_task(main.consume_message_request())
-    # task2 = loop.create_task(kafka.consume_message_from_user_service())
+    task1 = loop.create_task(main.consume_message_request())
+    task2 = loop.create_task(main.consume_message_from_payment_service())
     try:
         yield
     finally:
-        # for task in [task1,task2]:
+        for task in [task1, task2]:
             task.cancel()
-            await task
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+#  we get error  (We solve it by 
+#             except asyncio.CancelledError:
+                # pass
+# )
+
+# order  | WARNING:  WatchFiles detected changes in 'app/producer/main.py'. Reloading...
+# order  | INFO:     Shutting down
+# order  | INFO:     Waiting for application shutdown.
+# order  | INFO:aiokafka.consumer.group_coordinator:LeaveGroup request succeeded
+# order  | ERROR:    Traceback (most recent call last):
+# order  |   File "/usr/local/lib/python3.12/site-packages/starlette/routing.py", line 732, in lifespan
+# order  |     async with self.lifespan_context(app) as maybe_state:
+# order  |   File "/usr/local/lib/python3.12/contextlib.py", line 217, in __aexit__
+# order  |     await anext(self.gen)
+# order  |   File "/code/app/producer/main.py", line 142, in lifespan
+# order  |     try:
+# order  |   File "/code/app/consumer/main.py", line 301, in consume_message_request
+# order  |     async for msg in consumer:
+# order  |   File "/usr/local/lib/python3.12/site-packages/aiokafka/consumer/consumer.py", line 1268, in __anext__
+# order  |     return (await self.getone())
+# order  |             ^^^^^^^^^^^^^^^^^^^
+# order  |   File "/usr/local/lib/python3.12/site-packages/aiokafka/consumer/consumer.py", line 1154, in getone
+# order  |     msg = await self._fetcher.next_record(partitions)
+# order  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# order  |   File "/usr/local/lib/python3.12/site-packages/aiokafka/consumer/fetcher.py", line 1041, in next_record
+# order  |     await waiter
+# order  | asyncio.exceptions.CancelledError
 
 
 # verify_token:Annotated[model.User,Depends(auth.verify_access_token)]

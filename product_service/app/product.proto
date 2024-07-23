@@ -12,6 +12,7 @@ enum SelectOption {
     UPDATE =8;
     REDUCE = 9;
     DELETE =10;
+    PAYMENT_DONE = 11;
 }
 
 

@@ -280,7 +280,13 @@ async def consume_message_for_inventory_check():
             with Session(db.engine) as session:
                 inventory = session.exec(select(Inventory).where(Inventory.product_id == new_msg.product_id)).first()
                 logger.info(f"new_msg received at the consumer on the consumer side of inventory: {inventory}")
-                if inventory.stock_level > 0:
+                if new_msg.option == inventory_pb2.SelectOption.PAYMENT_DONE:
+                    inventory.reserved_stock -= new_msg.quantity
+                    inventory.sold_stock += new_msg.quantity
+                    session.add(inventory)
+                    session.commit()
+                    session.refresh(inventory)
+                elif inventory.stock_level > 0:
                     is_product_available = True
                     if new_msg.option == inventory_pb2.SelectOption.CREATE: 
                         if (inventory.stock_level - new_msg.quantity) >= 0:
