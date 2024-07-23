@@ -129,12 +129,12 @@ async def payment_request ( payment_request_detail:model.PaymentRequest , produc
         )
     serialized_payment = payment_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_payment)
-
     payment_proto = await consume_message_response_get()
 
-    if payment_proto.error_message or payment_proto.http_status_code :
-        raise HTTPException(status_code=payment_proto.http_status_code, detail=payment_proto.error_message)
-
+    if payment_proto.error_message :
+        return {
+            "Payment Status": payment_proto.error_message
+        }
     elif payment_proto.payment_status == payment_pb2.PaymentStatus.PAID:
         return {
             "payment_status" : "Paid ",

@@ -252,7 +252,7 @@ async  def update_order (order_id:UUID, order:OrdersInputField , producer:Annota
                     "quantity":order_proto.quantity,
                     "shipping_address":order_proto.shipping_address,
                     "customer_notes":order_proto.customer_notes
-                                }}
+                }}
 
 
 #  Endpoint to delete order from database 
