@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 
 #  Used for data validation and table fields 
 class Inventory(SQLModel, table=True):
-    __tablename__ = "inventory"
+    __tablename__ = "inventory_table"
     id: int | None = Field(default=None, primary_key=True)
     inventory_id: UUID = Field(default_factory=uuid.uuid4, index=True)
     product_id:UUID = Field(index=True)
     stock_level:int = Field(default=0,index=True)
     reserved_stock:int = Field(default=0,index=True)
+    sold_stock:int = Field(default=0,index=True)
 
 # Retry utility
 async def retry_async(func, retries=5, delay=2, *args, **kwargs):

@@ -77,7 +77,8 @@ async def consume_message_request():
                         session.add(select_order)
                         session.commit()
                         payment_proto = payment_pb2.Payment(
-                            order_id = str(payment_request.order_id),
+                            order_id = str(select_order.order_id),
+                            user_id = str(select_order.user_id),
                             payment_status = payment_pb2.PaymentStatus.PAID
                         )
                         serialized_payment = payment_proto.SerializeToString()
