@@ -15,14 +15,17 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
-    task = loop.create_task(user.consume_message_from_user_registration())
-    # task2 = loop.create_task(main.consume_message_request_from_order_service())
+    task1 = loop.create_task(user.consume_message_from_user_registration())
+    task2 = loop.create_task(order.consume_message_from_create_order())
     try:
         yield
     finally:
-        # for task in [task1,task2]:
+        for task in [task1,task2]:
             task.cancel()
-            await task
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 

@@ -156,6 +156,8 @@ async def handle_create_order(new_msg):
                         order_id = str(order.order_id),
                         product_id=str(order.product_id),
                         user_id=str(order.user_id),
+                        username= new_msg.username,
+                        email= new_msg.email ,
                         quantity=order.quantity,
                         shipping_address=order.shipping_address,
                         customer_notes=order.customer_notes,

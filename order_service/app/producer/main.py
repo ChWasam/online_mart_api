@@ -235,7 +235,7 @@ async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends
 #  Endpoint to add order to database 
 @app.post("/order/{product_id}", response_model=dict)
 async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)], verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
-    order_proto = order_pb2.Order(product_id = str(product_id), user_id = str(verify_token.user_id), quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes, order_status = order_pb2.OrderStatus.IN_PROGRESS, payment_status =order_pb2.PaymentStatus.PENDING,option = order_pb2.SelectOption.CREATE)
+    order_proto = order_pb2.Order(product_id = str(product_id), user_id = str(verify_token.user_id),username = verify_token.username,email = verify_token.email ,quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes, order_status = order_pb2.OrderStatus.IN_PROGRESS, payment_status =order_pb2.PaymentStatus.PENDING,option = order_pb2.SelectOption.CREATE)
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
 

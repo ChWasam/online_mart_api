@@ -61,18 +61,20 @@ message Order {
     string order_id=2;
     string product_id =3;
     string user_id = 4;
-    int64 quantity= 5;
-    string shipping_address = 6;
-    string customer_notes = 7;
-    int64 stock_level = 8;
-    bool is_product_available = 9;
-    bool is_stock_available  = 10;
-    string message = 11;
-    string error_message = 12;
-    OrderStatus order_status = 13;
-    PaymentStatus payment_status = 14;
-    SelectOption option =15;
-    int64 http_status_code = 16;
+    string username =5;
+    string email=6;
+    int64 quantity= 7;
+    string shipping_address = 8;
+    string customer_notes = 9;
+    int64 stock_level = 10;
+    bool is_product_available = 11;
+    bool is_stock_available  = 12;
+    string message = 13;
+    string error_message = 14;
+    OrderStatus order_status = 15;
+    PaymentStatus payment_status = 16;
+    SelectOption option =17;
+    int64 http_status_code = 18;
 }
 
 message InventoryList {
