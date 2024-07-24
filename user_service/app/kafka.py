@@ -33,7 +33,9 @@ async def create_topic ():
     await retry_async(admin_client.start)
     topic_list = [
         NewTopic(name=f"{(settings.KAFKA_TOPIC).strip()}", num_partitions=2, replication_factor=1),
-        NewTopic(name=f"{(settings.KAFKA_TOPIC_GET).strip()}", num_partitions=2, replication_factor=1)
+        NewTopic(name=f"{(settings.KAFKA_TOPIC_GET).strip()}", num_partitions=2, replication_factor=1),
+        NewTopic(name=f"{(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER).strip()}", num_partitions=2, replication_factor=1),
+        NewTopic(name=f"{(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT).strip()}", num_partitions=2, replication_factor=1),
     ]
     try:
         await admin_client.create_topics(new_topics=topic_list, validate_only= False)

@@ -33,7 +33,6 @@ message Inventory {
     int64 http_status_code = 14;
 }
 
-
 message Product {
     int32 id =1;
     string product_id=2;

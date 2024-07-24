@@ -27,7 +27,7 @@ async def consume_message_from_create_order():
                 if new_msg.option == notification_pb2.SelectOption.CREATE:
                     body = f"""Hi {new_msg.username},
 Thankyou for your order. Your order has been placed successfully.To Proceed, please make the payment. we will notify you once the payment is done."""
-                    subject = f"""Order Confirmation """
+                    subject = f"""Order Confirmation"""
                     await handle_email.send_email(body = body , subject = subject, user_email = new_msg.email)
                     # await handle_register_user(new_msg)
                     pass

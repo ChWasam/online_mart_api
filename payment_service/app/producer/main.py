@@ -100,14 +100,17 @@ async def lifespan(app: FastAPI):
     finally:
         for task in [task1,task2]:
             task.cancel()
-            await task
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 # verify_token:Annotated[model.User,Depends(auth.verify_access_token)]
 
 app:FastAPI = FastAPI(lifespan=lifespan )
 
-# app.include_router(router=user.user_router)
+app.include_router(router=user.user_router)
 
 
 # Home Endpoint
@@ -118,8 +121,19 @@ async def read_root():
 
 #  Endpoint to add payment 
 @app.put("/payment", response_model=dict)
-async def payment_request ( payment_request_detail:model.PaymentRequest , producer:Annotated[AIOKafkaProducer,Depends(produce_message)]):
+async def payment_request ( payment_request_detail:model.PaymentRequest , producer:Annotated[AIOKafkaProducer,Depends(produce_message)], verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
+    user_proto = payment_pb2.User(username = verify_token,
+    service = payment_pb2.SelectService.PAYMENT,
+    option = payment_pb2.SelectOption.CURRENT_USER)
+    serialized_user = user_proto.SerializeToString()
+    await kafka.produce_message(settings.KAFKA_TOPIC_REQUEST_TO_USER, serialized_user)
+
+    user_proto = await kafka.consume_message_from_user_service()
+
     payment_proto = payment_pb2.Payment(
+        user_id = user_proto.user_id,
+        username = user_proto.username,
+        email = user_proto.email,
         amount =payment_request_detail.amount,
         card_number = payment_request_detail.card_number,
         exp_month = payment_request_detail.exp_month,
@@ -133,7 +147,7 @@ async def payment_request ( payment_request_detail:model.PaymentRequest , produc
 
     if payment_proto.error_message :
         return {
-            "Payment Status": payment_proto.error_message
+            "Message": payment_proto.error_message
         }
     elif payment_proto.payment_status == payment_pb2.PaymentStatus.PAID:
         return {

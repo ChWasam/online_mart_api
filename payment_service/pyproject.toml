@@ -15,7 +15,8 @@ protobuf = "^5.27.0"
 aiokafka = "^0.10.0"
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
-
+python-multipart = "^0.0.9"
+pydantic = "^2.8.2"
 
 
 

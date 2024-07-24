@@ -15,6 +15,12 @@ enum SelectOption {
     PAYMENT_DONE = 11;
 }
 
+enum SelectService{
+    PAYMENT = 0;
+    ORDER = 1;
+}
+
+
 message User {
     int32 id =1;
     string user_id=2;
@@ -23,9 +29,10 @@ message User {
     string password =5;
     string access_token = 6;
     string refresh_token = 7;
-    string error_message = 8;
-    SelectOption option =9;
-    int64 http_status_code = 10;
+    SelectService service = 8;
+    string error_message = 9;
+    SelectOption option =10;
+    int64 http_status_code = 11;
 }
 
 message Inventory {
@@ -43,6 +50,25 @@ message Inventory {
     string error_message = 12;
     SelectOption option =13;
     int64 http_status_code = 14;
+}
+
+message Payment {
+    int32 id =1;
+    string payment_id=2;
+    string order_id =3;
+    string user_id=4;
+    string username =5;
+    string email=6;
+    string password =7;
+    float amount = 8;
+    int64 card_number = 9;
+    int32 exp_month = 10;
+    int32 exp_year = 11;
+    int32 cvc = 12;
+    PaymentStatus payment_status = 13;
+    SelectOption option =14;
+    int64 http_status_code = 15;
+    string error_message = 16;
 }
 
 

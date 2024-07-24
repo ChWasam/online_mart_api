@@ -59,8 +59,6 @@ async def handle_get_product(product_id):
             serialized_product = product_proto.SerializeToString()
             await produce_message(settings.KAFKA_TOPIC_GET, serialized_product)
 
-
-
 async def handle_register_user(new_msg):
     user = auth.check_user_in_db(new_msg.username, new_msg.email)
     if user:
@@ -119,7 +117,11 @@ async def handle_login(new_msg):
                 option = user_pb2.SelectOption.LOGIN
             )
             serialized_user = user_proto.SerializeToString()
-            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+            if new_msg.service == user_pb2.SelectService.PAYMENT:
+                await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+            elif new_msg.service == user_pb2.SelectService.ORDER:
+                await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
+
             logger.info(f"User logged in and sent back: {user_proto}")
         else:
             user_proto = user_pb2.User(
@@ -127,27 +129,39 @@ async def handle_login(new_msg):
                 http_status_code=401
             )
             serialized_user = user_proto.SerializeToString()
-            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+
+            if new_msg.service == user_pb2.SelectService.PAYMENT:
+                await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+            elif new_msg.service == user_pb2.SelectService.ORDER:
+                await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
     else:
         user_proto = user_pb2.User(
-        error_message=f"{new_msg.username} is not registered in not registered in database",
+        error_message=f"{new_msg.username} is not registered in database", 
         http_status_code=404
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+        if new_msg.service == user_pb2.SelectService.PAYMENT:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+        elif new_msg.service == user_pb2.SelectService.ORDER:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
             
 
 
 #  Function to handle update product request from producer side from where API is called to update product to database 
 async def handle_verify_user(new_msg):
+    logger.info(f"Username we get at consumer on user service to verify it: {new_msg.username}")
     user = auth.check_user_in_db(new_msg.username, new_msg.email)
+    logger.info(f"detail of user after checking it from database: {user}")
     if not user:
         user_proto = user_pb2.User(
         error_message=f"User with these credentials do not exists in database",
         http_status_code=404
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+        if new_msg.service == user_pb2.SelectService.PAYMENT:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+        elif new_msg.service == user_pb2.SelectService.ORDER:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
     else:
         user_proto = user_pb2.User(
             id=user.id,
@@ -158,7 +172,10 @@ async def handle_verify_user(new_msg):
             option = user_pb2.SelectOption.CURRENT_USER,
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+        if new_msg.service == user_pb2.SelectService.PAYMENT:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+        elif new_msg.service == user_pb2.SelectService.ORDER:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
         logger.info(f"User verified and username sent back: {user_proto}")
 
 async def handle_refresh_token(new_msg):
@@ -169,7 +186,10 @@ async def handle_refresh_token(new_msg):
         http_status_code=404
         )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+        if new_msg.service == user_pb2.SelectService.PAYMENT:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+        elif new_msg.service == user_pb2.SelectService.ORDER:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
     else:
     # Here i wish to generate a token and return it to the user
         expire_time = timedelta(minutes = settings.JWT_EXPIRY_TIME)
@@ -184,7 +204,10 @@ async def handle_refresh_token(new_msg):
             option = user_pb2.SelectOption.REFRESH_TOKEN
             )
         serialized_user = user_proto.SerializeToString()
-        await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER, serialized_user)
+        if new_msg.service == user_pb2.SelectService.PAYMENT:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_PAYMENT, serialized_user)
+        elif new_msg.service == user_pb2.SelectService.ORDER:
+            await kafka.produce_message(settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER, serialized_user)
         logger.info(f"User verified and email sent back: {user_proto}")
 
 

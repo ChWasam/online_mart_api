@@ -43,7 +43,6 @@ async def create_topic ():
     topic_list = [
         NewTopic(name=f"{settings.KAFKA_TOPIC}", num_partitions=2, replication_factor=1),
         NewTopic(name=f"{settings.KAFKA_TOPIC_GET}", num_partitions=2, replication_factor=1),
-        NewTopic(name=f"{settings.KAFKA_TOPIC_RESPONSE_FROM_USER}", num_partitions=2, replication_factor=1)
     ]
     try:
         await admin_client.create_topics(new_topics=topic_list, validate_only= False)
@@ -235,7 +234,27 @@ async def get_a_order(order_id:UUID, producer:Annotated[AIOKafkaProducer,Depends
 #  Endpoint to add order to database 
 @app.post("/order/{product_id}", response_model=dict)
 async  def add_order(product_id:UUID, order:OrdersInputField , producer:Annotated[AIOKafkaProducer,Depends(produce_message)], verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
-    order_proto = order_pb2.Order(product_id = str(product_id), user_id = str(verify_token.user_id),username = verify_token.username,email = verify_token.email ,quantity = order.quantity, shipping_address = order.shipping_address , customer_notes = order.customer_notes, order_status = order_pb2.OrderStatus.IN_PROGRESS, payment_status =order_pb2.PaymentStatus.PENDING,option = order_pb2.SelectOption.CREATE)
+    logger.info(f"Username that we get after decoding token and ready to send to user_service to get user detail:{verify_token}")
+    user_proto = order_pb2.User(username = verify_token,
+    service = order_pb2.SelectService.ORDER,
+    option = order_pb2.SelectOption.CURRENT_USER)
+    serialized_user = user_proto.SerializeToString()
+    await kafka.produce_message(settings.KAFKA_TOPIC_REQUEST_TO_USER, serialized_user)
+
+    user_proto = await kafka.consume_message_from_user_service()
+
+    order_proto = order_pb2.Order(
+        product_id = str(product_id), 
+        user_id = str(user_proto.user_id),
+        username = user_proto.username,
+        email = user_proto.email,
+        quantity = order.quantity,
+        shipping_address = order.shipping_address ,
+        customer_notes = order.customer_notes,
+        order_status = order_pb2.OrderStatus.IN_PROGRESS,
+        payment_status =order_pb2.PaymentStatus.PENDING,
+        option = order_pb2.SelectOption.CREATE)
+
     serialized_order = order_proto.SerializeToString()
     await producer.send_and_wait(f"{settings.KAFKA_TOPIC}",serialized_order)
 

@@ -64,36 +64,47 @@ async def consume_message_request():
             )
             with Session(db.engine) as session:
                 select_order = session.exec(select(model.Payment).where(model.Payment.order_id == uuid.UUID(new_msg.order_id))).first()
-                payment_response = await payment.create_payment(payment_request)
-                if select_order.payment_status == "Payment Done":
+                if select_order:
+                    payment_response = await payment.create_payment(payment_request)
+                    if select_order.payment_status == "Payment Done":
+                        payment_proto = payment_pb2.Payment(
+                                error_message=f"Payment Already Done",
+                            )
+                        serialized_payment = payment_proto.SerializeToString()
+                        await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
+                    else:    
+                        if payment_response == payment_pb2.PaymentStatus.PAID:
+                            select_order.payment_status = "Payment Done"
+                            session.add(select_order)
+                            session.commit()
+                            payment_proto = payment_pb2.Payment(
+                                user_id = str(new_msg.user_id),
+                                order_id = str(select_order.order_id),
+                                username = new_msg.username,
+                                email = new_msg.email,
+                                payment_status = payment_pb2.PaymentStatus.PAID
+                            )
+                            serialized_payment = payment_proto.SerializeToString()
+                            await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
+                        else:
+                            select_order.payment_status = "Payment Failed"
+                            session.add(select_order)
+                            session.commit()
+
+                            payment_proto = payment_pb2.Payment(
+                                order_id = str(payment.order_id),
+                                payment_status = payment_pb2.PaymentStatus.FAILED
+                            )
+                            serialized_payment = payment_proto.SerializeToString()
+                            await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
+                else:
                     payment_proto = payment_pb2.Payment(
-                            error_message=f"Payment Already Done",
-                        )
+                        error_message = "You haven't placed any order yet"
+
+                    )
                     serialized_payment = payment_proto.SerializeToString()
                     await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
-                else:    
-                    if payment_response == payment_pb2.PaymentStatus.PAID:
-                        select_order.payment_status = "Payment Done"
-                        session.add(select_order)
-                        session.commit()
-                        payment_proto = payment_pb2.Payment(
-                            order_id = str(select_order.order_id),
-                            user_id = str(select_order.user_id),
-                            payment_status = payment_pb2.PaymentStatus.PAID
-                        )
-                        serialized_payment = payment_proto.SerializeToString()
-                        await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
-                    else:
-                        select_order.payment_status = "Payment Failed"
-                        session.add(select_order)
-                        session.commit()
-
-                        payment_proto = payment_pb2.Payment(
-                            order_id = str(payment.order_id),
-                            payment_status = payment_pb2.PaymentStatus.FAILED
-                        )
-                        serialized_payment = payment_proto.SerializeToString()
-                        await produce_message(settings.KAFKA_TOPIC_GET, serialized_payment)
+                    
     except Exception as e:
         logger.error(f"Error processing message: {e}")
     finally:

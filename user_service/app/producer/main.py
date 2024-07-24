@@ -34,7 +34,10 @@ async def lifespan(app: FastAPI):
     finally:
         # for task in [task1,task2]:
             task.cancel()
-            await task
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 

@@ -21,7 +21,9 @@ user_router = APIRouter(
 # Login Endpoint
 @user_router.post("/login")
 async def login_user(login:Annotated[OAuth2PasswordRequestForm,Depends(OAuth2PasswordRequestForm)]):
-    user_proto = order_pb2.User(username = login.username, password = login.password, option = order_pb2.SelectOption.LOGIN)
+    user_proto = order_pb2.User(username = login.username, 
+    service = order_pb2.SelectService.ORDER,
+    password = login.password, option = order_pb2.SelectOption.LOGIN)
     serialized_user = user_proto.SerializeToString()
     await kafka.produce_message(settings.KAFKA_TOPIC_REQUEST_TO_USER, serialized_user)
 
@@ -37,13 +39,32 @@ async def login_user(login:Annotated[OAuth2PasswordRequestForm,Depends(OAuth2Pas
 # user/me
 
 @user_router.get("/me")
-async def get_current_user(verify_token:Annotated[model.User,Depends(auth.verify_access_token)]):
+async def get_current_user(verify_token:Annotated[str,Depends(auth.verify_access_token)]):
+    credentials_exception = HTTPException(status_code=401, 
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"}   
+    )
+    logger.info(f"Username that we get after decoding token and ready to send to user_service to get user detail:{verify_token}")
+    user_proto = order_pb2.User(username = verify_token,
+    service = order_pb2.SelectService.ORDER,
+    option = order_pb2.SelectOption.CURRENT_USER)
+    serialized_user = user_proto.SerializeToString()
+    await kafka.produce_message(settings.KAFKA_TOPIC_REQUEST_TO_USER, serialized_user)
+
+    user_proto = await kafka.consume_message_from_user_service()
+
+    logger.info(f"User detail that we get from user service:{user_proto}")
+    if user_proto.error_message or user_proto.http_status_code:
+        raise credentials_exception
+
+
+    logger.info(f"User detail that we get from user service at user/me endpoint :{verify_token}")
     return {
-            "id" : verify_token.id,
-            "user_id" : str(verify_token.user_id),
-            "username" : verify_token.username,
-            "email" : verify_token.email,
-            "password" : verify_token.password,
+            "id" : user_proto.id,
+            "user_id" : str(user_proto.user_id),
+            "username" : user_proto.username,
+            "email" : user_proto.email,
+            "password" : user_proto.password,
     }
 
 
@@ -58,7 +79,9 @@ async def refresh_token(old_refresh_token:str):
     email = auth.verify_refresh_token(old_refresh_token)
     if not email:
         raise credentials_exception
-    user_proto = order_pb2.User(email = email, option = order_pb2.SelectOption.REFRESH_TOKEN)
+    user_proto = order_pb2.User(email = email,
+    service = order_pb2.SelectService.ORDER,
+    option = order_pb2.SelectOption.REFRESH_TOKEN)
     serialized_user = user_proto.SerializeToString()
     await kafka.produce_message(settings.KAFKA_TOPIC_REQUEST_TO_USER, serialized_user)
 

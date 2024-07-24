@@ -26,8 +26,7 @@ async def consume_message_from_user_registration():
                 logger.info(f"new_msg on producer side:{new_msg}")
                 if new_msg.option == notification_pb2.SelectOption.REGISTER:
                     body = f"""Hi {new_msg.username},
-welcome to the online Mart. You have been successfully registered.
-Now you can buy products from online mart"""
+Welcome to Online Mart! You have successfully signed in. Explore our wide range of products and enjoy seamless shopping!"""
                     subject = f"""New User Registration """
                     await handle_email.send_email(body = body , subject = subject, user_email = new_msg.email)
                     # await handle_register_user(new_msg)

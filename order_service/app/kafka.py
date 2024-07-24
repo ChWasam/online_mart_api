@@ -24,7 +24,7 @@ async def retry_async(func, retries=5, delay=2, *args, **kwargs):
 #  Function to consume  messages from user service 
 async def consume_message_from_user_service():
     consumer = AIOKafkaConsumer(
-    f"{settings.KAFKA_TOPIC_RESPONSE_FROM_USER}",
+    f"{settings.KAFKA_TOPIC_RESPONSE_FROM_USER_TO_ORDER}",
     bootstrap_servers= f"{settings.BOOTSTRAP_SERVER}",
     group_id= f"{settings.KAFKA_CONSUMER_GROUP_ID_FOR_RESPONSE_FROM_USER}",
     auto_offset_reset='earliest'
@@ -36,7 +36,7 @@ async def consume_message_from_user_service():
             try:
                 new_msg = order_pb2.User()
                 new_msg.ParseFromString(msg.value)
-                logger.info(f"new_msg on producer side:{new_msg}")
+                logger.info(f"new_msg we get from user_service :{new_msg}")
                 return new_msg
             except Exception as e:
                 logger.error(f"Error Processing Message: {e} ")    
